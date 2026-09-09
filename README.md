@@ -142,16 +142,17 @@ SmartRelay/
 
 ## 🚀 Quick Setup Guide
 
-### 1. Setup Virtual Environment & Install Dependencies
+### 1. Clone & Install Dependencies
 ```bash
-# Navigate to the repository root
+# 1. Clone the repository
+git clone https://github.com/<your-username>/SmartRelay.git
 cd SmartRelay
 
-# Create and activate virtual environment
+# 2. Create and activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install SmartRelay in editable mode with development dependencies
+# 3. Install in editable mode
 pip install -e ".[dev]"
 ```
 
@@ -168,35 +169,41 @@ ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 ```
 
-### 3. Register with Claude Code
+### 3. Connect to Your AI Client
 
-Run this command directly from the `SmartRelay` project root directory:
+SmartRelay adheres to the official **Model Context Protocol (MCP)** standard over `stdio`, meaning it works with any MCP-compatible agent or IDE.
 
+#### 🟣 Claude Code (CLI)
+Run this command from inside the `SmartRelay` project root directory:
 ```bash
-# Register using dynamic path expansion (portable across any machine)
 claude mcp add smartrelay -- $(pwd)/.venv/bin/python -m mcp_delegation_server.server --config $(pwd)/config.yaml
 ```
+- Verify: `claude mcp list`
+- Remove: `claude mcp remove smartrelay`
 
-> **Alternative**: You can also use the installed binary directly:
-> ```bash
-> claude mcp add smartrelay -- $(pwd)/.venv/bin/smartrelay --config $(pwd)/config.yaml
-> ```
+#### 🔵 Cursor IDE
+1. Go to **Settings** ➔ **Features** ➔ **MCP**
+2. Click **+ Add New MCP Server**
+3. Set:
+   - **Name**: `smartrelay`
+   - **Type**: `command`
+   - **Command**: `/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay --config /ABSOLUTE/PATH/TO/SmartRelay/config.yaml`
 
-#### Verify Registration:
-```bash
-claude mcp list
+#### 🌊 Windsurf / Codeium
+Add the following to `~/.codeium/windsurf/mcp_config.json`:
+```json
+{
+  "mcpServers": {
+    "smartrelay": {
+      "command": "/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay",
+      "args": ["--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
+    }
+  }
+}
 ```
 
-#### Remove Server (if needed):
-```bash
-claude mcp remove smartrelay
-```
-
-<details>
-<summary><b>Using Claude Desktop instead?</b> (Click to expand)</summary>
-
-Add the server to your `claude_desktop_config.json` (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
+#### 🟠 Claude Desktop
+Add to your `claude_desktop_config.json` (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 ```json
 {
   "mcpServers": {
@@ -210,7 +217,19 @@ Add the server to your `claude_desktop_config.json` (`~/Library/Application Supp
   }
 }
 ```
-</details>
+
+#### 🟢 VS Code (Cline / Roo Code)
+In your Cline MCP settings (`cline_mcp_settings.json`):
+```json
+{
+  "mcpServers": {
+    "smartrelay": {
+      "command": "/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay",
+      "args": ["--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
+    }
+  }
+}
+```
 
 ---
 
