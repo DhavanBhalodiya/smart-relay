@@ -1,0 +1,16 @@
+server:
+  name: "mcp-delegation-server"
+  default_runner: "nemotron-3-super-120b-a12b"
+  max_concurrency: 5
+  default_timeout_seconds: 60.0
+
+# =========================================================================
+# Modular Runner Configurations (Organized by Provider & Purpose)
+# =========================================================================
+includes:
+  - "config/runners/agents.yaml"       # Specialized Role-Based Agents
+  - "config/runners/nvidia.yaml"       # NVIDIA NIM / API Catalog Models
+  - "config/runners/openrouter.yaml"   # OpenRouter Cloud Models
+  - "config/runners/ollama.yaml"       # Local Offline Models ($0.00)
+  - "config/runners/anthropic.yaml"    # Anthropic Direct API
+  - "config/runners/openai.yaml"       # OpenAI Direct API

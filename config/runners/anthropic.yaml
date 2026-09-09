@@ -1,0 +1,23 @@
+runners:
+  # ==========================================
+  # Anthropic Direct API
+  # ==========================================
+  claude-3-7-sonnet:
+    type: "anthropic"
+    model: "claude-3-7-sonnet-20250219"
+    api_key_env: "ANTHROPIC_API_KEY"
+    cost_per_million_input_tokens: 3.00
+    cost_per_million_output_tokens: 15.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.7
+
+  claude-3-5-haiku:
+    type: "anthropic"
+    model: "claude-3-5-haiku-20241022"
+    api_key_env: "ANTHROPIC_API_KEY"
+    cost_per_million_input_tokens: 0.80
+    cost_per_million_output_tokens: 4.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.7

@@ -1,0 +1,33 @@
+runners:
+  # ==========================================
+  # OpenRouter Cloud Models
+  # ==========================================
+  openrouter-claude-sonnet-4.5:
+    type: "openrouter"
+    model: "anthropic/claude-sonnet-4.5"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 3.00
+    cost_per_million_output_tokens: 15.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.7
+
+  openrouter-qwen-coder-free:
+    type: "openrouter"
+    model: "qwen/qwen-2.5-coder-32b-instruct:free"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.00
+    cost_per_million_output_tokens: 0.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.2
+
+  openrouter-deepseek-v3:
+    type: "openrouter"
+    model: "deepseek/deepseek-chat"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.14
+    cost_per_million_output_tokens: 0.28
+    default_params:
+      max_tokens: 2048
+      temperature: 0.7

@@ -1,0 +1,33 @@
+runners:
+  # ==========================================
+  # Local Ollama Models (100% Free & Offline)
+  # ==========================================
+  ollama-llama3.2:
+    type: "ollama"
+    model: "llama3.2"
+    base_url: "http://localhost:11434"
+    cost_per_million_input_tokens: 0.00
+    cost_per_million_output_tokens: 0.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.7
+
+  ollama-qwen-coder:
+    type: "ollama"
+    model: "qwen2.5-coder:7b"
+    base_url: "http://localhost:11434"
+    cost_per_million_input_tokens: 0.00
+    cost_per_million_output_tokens: 0.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.2
+
+  ollama-deepseek-r1:
+    type: "ollama"
+    model: "deepseek-r1:8b"
+    base_url: "http://localhost:11434"
+    cost_per_million_input_tokens: 0.00
+    cost_per_million_output_tokens: 0.00
+    default_params:
+      max_tokens: 2048
+      temperature: 0.6
