@@ -121,7 +121,7 @@ Call tool benchmark_run with task='Write an LRU Cache in Dart' and runner_ids=['
 Configurations and system prompts are cleanly isolated into dedicated files:
 
 ```text
-MCPDEMO/
+SmartRelay/
 ├── config.yaml               ← Main server entrypoint (uses includes:)
 ├── config/
 │   └── runners/
@@ -144,14 +144,23 @@ MCPDEMO/
 
 ### 1. Setup Virtual Environment & Install Dependencies
 ```bash
-cd /Users/indianic/FLUTTER/MCPDEMO
+# Navigate to the repository root
+cd SmartRelay
+
+# Create and activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
+
+# Install SmartRelay in editable mode with development dependencies
 pip install -e ".[dev]"
 ```
 
 ### 2. Configure Environment Variables (`.env`)
-Create or edit `.env` in the project root:
+Copy the example environment file and add your API keys:
+```bash
+cp .env.example .env
+```
+Edit `.env`:
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-...
 NVIDIA_API_KEY=nvapi-...
@@ -160,9 +169,48 @@ OPENAI_API_KEY=sk-...
 ```
 
 ### 3. Register with Claude Code
+
+Run this command directly from the `SmartRelay` project root directory:
+
 ```bash
-claude mcp add smartrelay -- /Users/indianic/FLUTTER/MCPDEMO/.venv/bin/python -m mcp_delegation_server.server --config /Users/indianic/FLUTTER/MCPDEMO/config.yaml
+# Register using dynamic path expansion (portable across any machine)
+claude mcp add smartrelay -- $(pwd)/.venv/bin/python -m mcp_delegation_server.server --config $(pwd)/config.yaml
 ```
+
+> **Alternative**: You can also use the installed binary directly:
+> ```bash
+> claude mcp add smartrelay -- $(pwd)/.venv/bin/smartrelay --config $(pwd)/config.yaml
+> ```
+
+#### Verify Registration:
+```bash
+claude mcp list
+```
+
+#### Remove Server (if needed):
+```bash
+claude mcp remove smartrelay
+```
+
+<details>
+<summary><b>Using Claude Desktop instead?</b> (Click to expand)</summary>
+
+Add the server to your `claude_desktop_config.json` (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "smartrelay": {
+      "command": "/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay",
+      "args": [
+        "--config",
+        "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"
+      ]
+    }
+  }
+}
+```
+</details>
 
 ---
 

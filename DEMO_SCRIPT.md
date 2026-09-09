@@ -12,7 +12,7 @@
 
 Run this in your terminal to verify the server is working:
 ```bash
-cd /Users/indianic/FLUTTER/MCPDEMO
+cd /Users/indianic/FLUTTER/SmartRelay
 .venv/bin/python scripts/quick_test.py --list
 ```
 ✅ You should see 19 runners listed across NVIDIA, OpenRouter, Anthropic, OpenAI, and Ollama.
@@ -254,7 +254,7 @@ Call tool benchmark_run with task='Write a production-ready Flutter DebouncedSea
 
 Run in terminal:
 ```bash
-cd /Users/indianic/FLUTTER/MCPDEMO
+cd /Users/indianic/FLUTTER/SmartRelay
 npx -y @modelcontextprotocol/inspector .venv/bin/python -- -m mcp_delegation_server.server --config config.yaml
 ```
 
