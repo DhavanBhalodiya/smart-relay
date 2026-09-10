@@ -5,21 +5,83 @@ import type { RunnerRegistry } from './runners/registry.js';
 
 /** Provider shortcut groups, tried in order until a configured runner is found. */
 const PROVIDER_SHORTCUTS: ReadonlyArray<{ match: readonly string[]; candidates: readonly string[] }> = [
+  // 1. Providers
   {
-    match: ['nvidia', 'nemotron'],
-    candidates: ['nemotron-3-super-120b-a12b', 'nvidia-llama-70b', 'nvidia-qwen-coder', 'nvidia-deepseek-r1'],
+    match: ['openrouter', 'or'],
+    candidates: [
+      'openrouter-claude-3.7-sonnet',
+      'openrouter-deepseek-r1',
+      'openrouter-deepseek-v3',
+      'openrouter-qwen-2.5-coder',
+      'openrouter-claude-sonnet-4.5',
+    ],
   },
   {
-    match: ['ollama', 'local', 'free'],
-    candidates: ['ollama-qwen-coder', 'ollama-llama3.2', 'ollama-deepseek-r1', 'openrouter-qwen-coder-free'],
+    match: ['nvidia', 'nemotron'],
+    candidates: [
+      'nemotron-3-super-120b-a12b',
+      'nvidia-llama-3.3-70b',
+      'nvidia-llama-70b',
+      'nvidia-qwen-coder',
+      'nvidia-deepseek-r1',
+    ],
+  },
+  {
+    match: ['ollama', 'local'],
+    candidates: ['ollama-qwen-coder', 'ollama-llama3.2', 'ollama-deepseek-r1'],
+  },
+  {
+    match: ['openai'],
+    candidates: ['gpt-4o', 'gpt-4o-mini', 'test-generator-agent'],
+  },
+
+  // 2. Model Families (Natural & Explicit)
+  {
+    match: ['deepseek', 'r1'],
+    candidates: [
+      'openrouter-deepseek-r1',
+      'nvidia-deepseek-r1',
+      'openrouter-deepseek-v3',
+      'ollama-deepseek-r1',
+    ],
+  },
+  {
+    match: ['v3', 'deepseek-v3'],
+    candidates: ['openrouter-deepseek-v3'],
   },
   {
     match: ['claude', 'sonnet'],
-    candidates: ['openrouter-claude-sonnet-4.5', 'code-review-agent', 'claude-3-7-sonnet'],
+    candidates: [
+      'openrouter-claude-sonnet-4.5',
+      'openrouter-claude-3.7-sonnet',
+      'code-review-agent',
+      'claude-3-7-sonnet',
+    ],
   },
   {
-    match: ['openai', 'gpt'],
-    candidates: ['gpt-4o', 'gpt-4o-mini', 'test-generator-agent'],
+    match: ['qwen'],
+    candidates: [
+      'openrouter-qwen-2.5-coder',
+      'nvidia-qwen-coder',
+      'ollama-qwen-coder',
+      'openrouter-qwen-coder-free',
+    ],
+  },
+  {
+    match: ['llama'],
+    candidates: [
+      'openrouter-llama-3.3-70b',
+      'nvidia-llama-3.3-70b',
+      'ollama-llama3.2',
+    ],
+  },
+  {
+    match: ['gemini'],
+    candidates: ['openrouter-gemini-2.0-flash'],
+  },
+  {
+    match: ['gpt'],
+    candidates: ['gpt-4o', 'gpt-4o-mini', 'planner-agent'],
   },
 ];
 
@@ -80,6 +142,37 @@ export class TaskRouter {
 
   constructor(public readonly registry: RunnerRegistry) {}
 
+  /** Formats a clean interactive menu of available shortcuts and runners. */
+  formatMenu(): string {
+    const activeText = this.activeRunnerId
+      ? `Pinned to \`${this.activeRunnerId}\``
+      : '🟢 Auto-Routing (routes dynamically based on task intent)';
+
+    const lines: string[] = [
+      '⚡ **SmartRelay Model Fleet**',
+      '',
+      `**Current Mode**: ${activeText}`,
+      '',
+      '### ⚡ Natural Language Shortcuts',
+      '| What to say | Target Model & Provider | Purpose |',
+      '| :--- | :--- | :--- |',
+      '| **`Switch to openrouter`** | Claude 3.7 Sonnet (OpenRouter) | Flagship Cloud Reasoning & Code |',
+      '| **`Switch to deepseek`** | DeepSeek-R1 671B (OpenRouter / NVIDIA) | Deep Reasoning with CoT |',
+      '| **`Switch to v3`** | DeepSeek-V3 671B (OpenRouter) | High-Speed Code & Chat |',
+      '| **`Switch to qwen`** | Qwen 2.5 Coder 32B (OpenRouter / NVIDIA) | Code Specialist |',
+      '| **`Switch to llama`** | Llama 3.3 70B (OpenRouter / NVIDIA) | System Architecture & Planning |',
+      '| **`Switch to gemini`** | Gemini 2.0 Flash (OpenRouter) | Ultra-Fast & 1M Token Context |',
+      '| **`Switch to nvidia`** | Nemotron 3 Super 120B (NVIDIA NIM) | Heavyweight Cloud Agent |',
+      '| **`Switch to claude`** | Claude Sonnet 4.5 / 3.7 | Elite Code & Review |',
+      '| **`Switch to ollama`** | Qwen 2.5 Coder (Local Ollama) | Free $0.00 Offline Runner |',
+      '| **`Switch to auto`** | Smart Intent Routing (default) | Automatic Agent Routing |',
+      '| **`Switch to direct`** | Native Claude Intelligence | Bypass Sub-Agents |',
+      '',
+      "💡 *Tip: Say 'Switch to deepseek', 'Switch to qwen', or 'Switch to openrouter' anytime.*",
+    ];
+    return lines.join('\n');
+  }
+
   /** Resolve a shortcut or provider name (e.g. 'nvidia', 'ollama', 'claude') to a runner. */
   resolveShortcut(target: string): BaseRunner | null {
     const targetClean = target.trim().toLowerCase();
@@ -112,6 +205,13 @@ export class TaskRouter {
   setActiveRunner(target: string): { ok: boolean; message: string } {
     const targetClean = target.trim().toLowerCase();
 
+    if (['list', 'help', '?', 'status', 'models', 'menu', ''].includes(targetClean)) {
+      return {
+        ok: true,
+        message: this.formatMenu(),
+      };
+    }
+
     if (['auto', 'default', 'reset'].includes(targetClean)) {
       this.activeRunnerId = null;
       return {
@@ -134,7 +234,10 @@ export class TaskRouter {
 
     return {
       ok: false,
-      message: `Could not find runner matching '${target}'. Available runners: ${this.formatAvailable()}`,
+      message:
+        `Could not find runner matching '${target}'.\n\n` +
+        `💡 Quick shortcuts: 'openrouter', 'deepseek', 'qwen', 'llama', 'gemini', 'nvidia', 'claude', 'ollama', 'auto'.\n` +
+        `Available runners: ${this.formatAvailable()}`,
     };
   }
 

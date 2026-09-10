@@ -75,14 +75,21 @@ Opens an interactive UI at **http://localhost:6274** where you can execute and i
 
 Switch models on the fly during your session — just type plain English:
 
-| What to say | What happens |
-| :--- | :--- |
-| **`Switch to nvidia`** | Routes tasks to **NVIDIA NIM** (Nemotron 3 Super 120B) |
-| **`Switch to claude`** | Routes tasks to **Claude Sonnet** via OpenRouter |
-| **`Switch to ollama`** / **`Switch to local`** | Routes to local offline **Qwen 2.5 Coder** (free, $0) |
-| **`Switch to auto`** | Restores smart routing (reviews → reviewer, plans → planner) |
-| **`Switch to direct`** | Claude answers directly with its own intelligence |
-| **`What model is active?`** | Calls `get_active_model` and shows current runner |
+| What to say | Target Model & Provider | Purpose |
+| :--- | :--- | :--- |
+| **`Switch to openrouter`** | **Claude 3.7 Sonnet** via OpenRouter | Flagship cloud reasoning & architecture |
+| **`Switch to deepseek`** / **`Switch to r1`** | **DeepSeek-R1 671B** via OpenRouter / NIM | Deep reasoning with chain-of-thought (CoT) |
+| **`Switch to v3`** | **DeepSeek-V3 671B** via OpenRouter | High-speed code generation ($0.14/M) |
+| **`Switch to qwen`** | **Qwen 2.5 Coder 32B** | Specialized code intelligence |
+| **`Switch to llama`** | **Llama 3.3 70B** | Meta flagship for planning & system design |
+| **`Switch to gemini`** | **Gemini 2.0 Flash** via OpenRouter | Ultra-fast with 1M token context window |
+| **`Switch to nvidia`** | **NVIDIA NIM** (Nemotron 3 Super 120B) | Heavyweight cloud code & test agent |
+| **`Switch to claude`** | **Claude Sonnet 4.5 / 3.7** | Elite code reviews & refactoring |
+| **`Switch to ollama`** / **`Switch to local`** | Local **Qwen 2.5 Coder** | $0.00 completely free & offline |
+| **`Switch to auto`** | Smart intent routing (default) | Automatically picks the best agent for the task |
+| **`Switch to direct`** | Claude Code native intelligence | Answers directly without sub-agents |
+| **`What model is active?`** | Calls `get_active_model` | Shows current runner and routing mode |
+| **`What models can I switch to?`** | Calls `switch_model(model='list')` | Displays full interactive model fleet menu |
 
 ---
 
@@ -156,11 +163,11 @@ Call tool benchmark_run with task='Write an LRU Cache in Dart' and runner_ids=['
 
 | Provider | Models | Env Variable |
 | :--- | :--- | :--- |
+| **OpenRouter** | Claude 3.7 Sonnet, DeepSeek-R1 (671B), DeepSeek-V3, Qwen 2.5 Coder, Llama 3.3 70B, Gemini 2.0 Flash | `OPENROUTER_API_KEY` |
 | **NVIDIA NIM** | Nemotron 3 Super 120B, Llama 3.3 70B, Qwen Coder, DeepSeek R1 | `NVIDIA_API_KEY` |
-| **OpenRouter** | Claude Sonnet 4.5, Qwen Coder (free), DeepSeek V3 | `OPENROUTER_API_KEY` |
+| **Local Ollama** | Qwen 2.5 Coder, Llama 3.2, DeepSeek-R1 | *(none — free & offline)* |
 | **Anthropic Direct** | Claude 3.7 Sonnet, Claude 3.5 Haiku | `ANTHROPIC_API_KEY` |
 | **OpenAI Direct** | GPT-4o, GPT-4o-mini | `OPENAI_API_KEY` |
-| **Local Ollama** | Qwen 2.5 Coder, Llama 3.2, DeepSeek-R1 | *(none — free & offline)* |
 
 ---
 

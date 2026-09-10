@@ -87,16 +87,20 @@ server.registerTool(
   'switch_model',
   {
     description:
-      'Switch the active model/sub-agent for subsequent coding, review, and question tasks. ' +
-      "Use options like 'nvidia', 'claude', 'ollama', 'auto', or 'direct'.",
+      'Switch the active model/sub-agent for subsequent coding, review, and question tasks, or view available models. ' +
+      "Shortcuts include: 'openrouter', 'deepseek', 'v3', 'qwen', 'llama', 'gemini', 'nvidia', 'claude', 'ollama', 'auto', or 'direct'. " +
+      "Call with no argument or 'list' to view the full model menu.",
     inputSchema: z.object({
-      model: z.string().describe(
-        "Target model or provider shortcut ('nvidia', 'claude', 'ollama', 'auto', 'direct', or runner ID)",
-      ),
+      model: z
+        .string()
+        .optional()
+        .describe(
+          "Target model or shortcut ('openrouter', 'deepseek', 'v3', 'qwen', 'llama', 'gemini', 'nvidia', 'claude', 'ollama', 'auto', 'direct', or 'list')",
+        ),
     }),
   },
   async ({ model }) => {
-    const msg = switchModel(getRouter(), model);
+    const msg = switchModel(getRouter(), model ?? 'list');
     return { content: [{ type: 'text', text: msg }] };
   },
 );

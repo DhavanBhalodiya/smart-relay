@@ -2,6 +2,66 @@ runners:
   # ==========================================
   # OpenRouter Cloud Models
   # ==========================================
+  openrouter-claude-3.7-sonnet:
+    type: "openrouter"
+    model: "anthropic/claude-3.7-sonnet"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 3.00
+    cost_per_million_output_tokens: 15.00
+    default_params:
+      max_tokens: 4096
+      temperature: 0.5
+
+  openrouter-deepseek-r1:
+    type: "openrouter"
+    model: "deepseek/deepseek-r1"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.55
+    cost_per_million_output_tokens: 2.19
+    default_params:
+      max_tokens: 4096
+      temperature: 0.6
+
+  openrouter-deepseek-v3:
+    type: "openrouter"
+    model: "deepseek/deepseek-chat"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.14
+    cost_per_million_output_tokens: 0.28
+    default_params:
+      max_tokens: 2048
+      temperature: 0.7
+
+  openrouter-qwen-2.5-coder:
+    type: "openrouter"
+    model: "qwen/qwen-2.5-coder-32b-instruct"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.12
+    cost_per_million_output_tokens: 0.20
+    default_params:
+      max_tokens: 4096
+      temperature: 0.2
+
+  openrouter-llama-3.3-70b:
+    type: "openrouter"
+    model: "meta-llama/llama-3.3-70b-instruct"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.12
+    cost_per_million_output_tokens: 0.30
+    default_params:
+      max_tokens: 4096
+      temperature: 0.7
+
+  openrouter-gemini-2.0-flash:
+    type: "openrouter"
+    model: "google/gemini-2.0-flash-001"
+    api_key_env: "OPENROUTER_API_KEY"
+    cost_per_million_input_tokens: 0.10
+    cost_per_million_output_tokens: 0.40
+    default_params:
+      max_tokens: 4096
+      temperature: 0.7
+
   openrouter-claude-sonnet-4.5:
     type: "openrouter"
     model: "anthropic/claude-sonnet-4.5"
@@ -21,13 +81,3 @@ runners:
     default_params:
       max_tokens: 2048
       temperature: 0.2
-
-  openrouter-deepseek-v3:
-    type: "openrouter"
-    model: "deepseek/deepseek-chat"
-    api_key_env: "OPENROUTER_API_KEY"
-    cost_per_million_input_tokens: 0.14
-    cost_per_million_output_tokens: 0.28
-    default_params:
-      max_tokens: 2048
-      temperature: 0.7
