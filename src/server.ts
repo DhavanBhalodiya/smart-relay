@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /** MCP Delegation Server entrypoint and tool registration. */
 
+import { realpathSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/server';
@@ -84,16 +87,20 @@ server.registerTool(
   'switch_model',
   {
     description:
-      'Switch the active model/sub-agent for subsequent coding, review, and question tasks. ' +
-      "Use options like 'nvidia', 'claude', 'ollama', 'auto', or 'direct'.",
+      'Switch the active model/sub-agent for subsequent coding, review, and question tasks, or view available models. ' +
+      "Shortcuts include: 'openrouter', 'deepseek', 'v3', 'qwen', 'llama', 'gemini', 'nvidia', 'claude', 'ollama', 'auto', or 'direct'. " +
+      "Call with no argument or 'list' to view the full model menu.",
     inputSchema: z.object({
-      model: z.string().describe(
-        "Target model or provider shortcut ('nvidia', 'claude', 'ollama', 'auto', 'direct', or runner ID)",
-      ),
+      model: z
+        .string()
+        .optional()
+        .describe(
+          "Target model or shortcut ('openrouter', 'deepseek', 'v3', 'qwen', 'llama', 'gemini', 'nvidia', 'claude', 'ollama', 'auto', 'direct', or 'list')",
+        ),
     }),
   },
   async ({ model }) => {
-    const msg = switchModel(getRouter(), model);
+    const msg = switchModel(getRouter(), model ?? 'list');
     return { content: [{ type: 'text', text: msg }] };
   },
 );
@@ -388,10 +395,21 @@ export async function runServer(options?: {
 }
 
 // Direct execution entrypoint
-const isDirectExecution =
-  process.argv[1]?.endsWith('server.ts') || process.argv[1]?.endsWith('server.js');
+function checkDirectExecution(): boolean {
+  const script = process.argv[1];
+  if (!script) return false;
+  try {
+    const realScript = realpathSync(script);
+    const thisFile = realpathSync(fileURLToPath(import.meta.url));
+    if (realScript === thisFile) return true;
+  } catch {
+    // Fall back to filename checks
+  }
+  const base = path.basename(script, path.extname(script));
+  return ['server', 'smartrelay', 'mcp-delegation-server'].includes(base);
+}
 
-if (isDirectExecution) {
+if (checkDirectExecution()) {
   const { values } = parseArgs({
     options: {
       config: { type: 'string', short: 'c' },

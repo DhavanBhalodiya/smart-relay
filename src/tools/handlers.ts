@@ -67,7 +67,7 @@ export function readFileFromDisk(filePath: string): { content: string | null; er
 }
 
 /** Switch the active model/sub-agent for subsequent tasks. */
-export function switchModel(router: TaskRouter, model: string): string {
+export function switchModel(router: TaskRouter, model: string = 'list'): string {
   const { message } = router.setActiveRunner(model);
   return message;
 }

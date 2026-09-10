@@ -7,6 +7,9 @@
  * Transport: HTTP/JSON with Bearer token auth.
  */
 
+import { realpathSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 
@@ -342,10 +345,21 @@ export async function runHttpServer(options?: {
   logger.info(`SmartRelay HTTP API server listening on http://${host}:${port}`);
 }
 
-const isDirectExecution =
-  process.argv[1]?.endsWith('http-api.ts') || process.argv[1]?.endsWith('http-api.js');
+function checkDirectExecution(): boolean {
+  const script = process.argv[1];
+  if (!script) return false;
+  try {
+    const realScript = realpathSync(script);
+    const thisFile = realpathSync(fileURLToPath(import.meta.url));
+    if (realScript === thisFile) return true;
+  } catch {
+    // Fall back to filename checks
+  }
+  const base = path.basename(script, path.extname(script));
+  return ['http-api', 'smartrelay-http'].includes(base);
+}
 
-if (isDirectExecution) {
+if (checkDirectExecution()) {
   const { values } = parseArgs({
     options: {
       config: { type: 'string', short: 'c' },
