@@ -46,3 +46,7 @@ htmlcov/
 # SQLite Databases
 *.sqlite
 *.db
+
+# Node / TypeScript
+node_modules/
+*.tsbuildinfo

@@ -1,0 +1,49 @@
+{
+  "name": "smartrelay",
+  "version": "0.2.0",
+  "description": "MCP server for delegating tasks across LLM backends and benchmarking their outputs",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "smartrelay": "dist/server.js",
+    "mcp-delegation-server": "dist/server.js",
+    "smartrelay-http": "dist/http-api.js"
+  },
+  "files": [
+    "dist",
+    "config",
+    "config.yaml",
+    "prompts"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/server.ts",
+    "dev:http": "tsx src/http-api.ts",
+    "start": "node dist/server.js",
+    "start:http": "node dist/http-api.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "quick-test": "tsx scripts/quick-test.ts",
+    "test:plugin": "tsx scripts/test-plugin.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "fastify": "^5.12.3",
+    "openai": "^7.12.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
