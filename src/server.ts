@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /** MCP Delegation Server entrypoint and tool registration. */
 
+import { realpathSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/server';
@@ -388,10 +391,21 @@ export async function runServer(options?: {
 }
 
 // Direct execution entrypoint
-const isDirectExecution =
-  process.argv[1]?.endsWith('server.ts') || process.argv[1]?.endsWith('server.js');
+function checkDirectExecution(): boolean {
+  const script = process.argv[1];
+  if (!script) return false;
+  try {
+    const realScript = realpathSync(script);
+    const thisFile = realpathSync(fileURLToPath(import.meta.url));
+    if (realScript === thisFile) return true;
+  } catch {
+    // Fall back to filename checks
+  }
+  const base = path.basename(script, path.extname(script));
+  return ['server', 'smartrelay', 'mcp-delegation-server'].includes(base);
+}
 
-if (isDirectExecution) {
+if (checkDirectExecution()) {
   const { values } = parseArgs({
     options: {
       config: { type: 'string', short: 'c' },

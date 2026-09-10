@@ -3,19 +3,44 @@
 > **The intelligent delegation layer & zero-token task server for AI agents.**
 
 [![MCP Standard](https://img.shields.io/badge/MCP-Standard-blue.svg)](https://modelcontextprotocol.io)
-[![Context](https://img.shields.io/badge/Context-Zero--Token-green.svg)](#-1-click-dedicated-tools)
-[![Fleet](https://img.shields.io/badge/Fleet-NVIDIA%20%7C%20Claude%20%7C%20Ollama%20%7C%20OpenAI-orange.svg)](#-natural-language-model-switching)
+[![TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178C6.svg)](https://www.typescriptlang.org)
 [![Tests](https://img.shields.io/badge/Tests-39%20Passing-brightgreen.svg)](#-testing--verification)
-[![npm](https://img.shields.io/badge/npm-smartrelay-red.svg)](https://www.npmjs.com/package/smartrelay)
+[![Fleet](https://img.shields.io/badge/Fleet-NVIDIA%20%7C%20Claude%20%7C%20Ollama%20%7C%20OpenAI-orange.svg)](#-supported-backends--models)
 
-**SmartRelay** is a high-performance Model Context Protocol (MCP) server built with TypeScript and the official `@modelcontextprotocol/server` SDK. It transforms **Claude Code** and other agentic IDEs into a **Master Orchestrator**—delegating heavy tasks (code reviews, test generation, explanations, architecture planning) to specialized sub-agents (NVIDIA NIM, Claude Sonnet 4.5, GPT-4o, local Ollama) with **zero context-window bloat** and concurrent multi-model benchmarking.
+**SmartRelay** is a high-performance [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server built with TypeScript. It transforms **Claude Code**, **Cursor**, **Windsurf**, and other MCP-compatible AI editors into a **Master Orchestrator** — delegating heavy tasks (code reviews, test generation, explanations, architecture planning) to specialized sub-agents (NVIDIA NIM, Claude Sonnet, GPT-4o, local Ollama) with **zero context-window bloat** and concurrent multi-model benchmarking.
 
 ---
 
-## 🚀 For Other Users — Quick Install (3 Options)
+## 📋 Prerequisites
 
-### Option A — `npx` (No install, no clone)
-Add to your AI client config and restart. SmartRelay runs on demand via `npx`:
+Before installing, ensure you have:
+- **Node.js**: `v20.11.0` or higher (`node -v`)
+- **Git**
+- *(Optional)* **[Ollama](https://ollama.ai)**: If using local offline models (`ollama serve && ollama pull qwen2.5-coder`)
+- API keys for at least one provider (Anthropic, OpenAI, OpenRouter, or NVIDIA NIM)
+
+---
+
+## 🚀 Quick Install
+
+### Option A — Clone & Build *(Recommended — works immediately)*
+
+```bash
+git clone https://github.com/DhavanBhalodiya/smart-relay.git
+cd smart-relay
+npm install
+npm run build
+cp .env.example .env   # fill in your API keys
+```
+
+> **Optional (CLI shortcut)**: Run `npm link` inside the directory to make the `smartrelay` command available anywhere on your machine.
+
+Now connect it to your editor — see [Connect to Your AI Client](#4-connect-to-your-ai-client) below.
+
+### Option B — `npx` *(available once published to npm registry)*
+
+Add directly to your Claude Desktop / Cursor / Windsurf MCP configuration:
+
 ```json
 {
   "mcpServers": {
@@ -25,75 +50,71 @@ Add to your AI client config and restart. SmartRelay runs on demand via `npx`:
       "env": {
         "OPENAI_API_KEY": "sk-...",
         "ANTHROPIC_API_KEY": "sk-ant-...",
-        "NVIDIA_API_KEY": "nvapi-..."
+        "NVIDIA_API_KEY": "nvapi-...",
+        "OPENROUTER_API_KEY": "sk-or-v1-..."
       }
     }
   }
 }
 ```
-> Works in: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code (Cline)
 
-### Option B — Clone from GitHub
+### Option C — Browser Test Drive (MCP Inspector)
+
+Test all 13 tools interactively in your browser with zero editor configuration:
+
 ```bash
-git clone https://github.com/DhavanBhalodiya/smart-relay
 cd smart-relay
-npm install && npm run build
-cp .env.example .env   # Add your API keys
-```
-Then point your MCP client at `dist/server.js` (see [Connect to Your AI Client](#3-connect-to-your-ai-client) below).
-
-### Option C — Browser Test Drive (MCP Inspector UI)
-```bash
-# From inside the SmartRelay project directory:
-cd /path/to/smart-relay
-npm run build   # one-time build step
+npm run build
 npx -y @modelcontextprotocol/inspector node dist/server.js
 ```
-Opens a visual tool browser at **http://localhost:6274** — test all 18 tools right in your browser.
+Opens an interactive UI at **http://localhost:6274** where you can execute and inspect tools live.
 
 ---
 
-## ⚡ Natural Language Model Switching (Plain English!)
+## ⚡ Natural Language Model Switching
 
-You can switch models on the fly during your Claude Code session just by typing plain English sentences. No code syntax required!
+Switch models on the fly during your session — just type plain English:
 
-| What to say to Claude Code | What Happens |
+| What to say | What happens |
 | :--- | :--- |
-| **`Switch to nvidia`** | Routes all subsequent code & questions to **NVIDIA NIM** (`nemotron-3-super-120b-a12b`). |
-| **`Switch to claude`** | Routes all subsequent tasks to **Claude Sonnet 4.5** via OpenRouter. |
-| **`Switch to ollama`** (or **`Switch to local`**) | Routes all tasks to local offline **Qwen 2.5 Coder** (100% Free, $0.00). |
-| **`Switch to auto`** | Restores smart routing (reviews ➔ code reviewer, plans ➔ planner). |
-| **`Switch to direct`** | Tells Claude Code to answer directly with its native intelligence. |
-| **`What model is active?`** | Calls `get_active_model` to display the currently active runner. |
+| **`Switch to nvidia`** | Routes tasks to **NVIDIA NIM** (Nemotron 3 Super 120B) |
+| **`Switch to claude`** | Routes tasks to **Claude Sonnet** via OpenRouter |
+| **`Switch to ollama`** / **`Switch to local`** | Routes to local offline **Qwen 2.5 Coder** (free, $0) |
+| **`Switch to auto`** | Restores smart routing (reviews → reviewer, plans → planner) |
+| **`Switch to direct`** | Claude answers directly with its own intelligence |
+| **`What model is active?`** | Calls `get_active_model` and shows current runner |
 
 ---
 
-## 🛠️ 1-Click Dedicated Tools
+## 🛠️ 13 MCP Tools
 
-| Tool | Plain English Prompt | What It Does |
-| :--- | :--- | :--- |
-| **`review_file`** ⭐ | *"Call tool `review_file` with file_path='lib/login.dart'"* | **TRUE zero-token**: Server reads file directly from disk and returns 🛡️ Code Review Report. |
-| **`test_file`** ⭐ | *"Call tool `test_file` with file_path='lib/auth.dart'"* | **TRUE zero-token**: Server reads file directly from disk and generates tests. |
-| **`explain_file`** ⭐ | *"Call tool `explain_file` with file_path='lib/router.dart'"* | **TRUE zero-token**: Server reads file and returns 📖 plain-English explanation — purpose, logic, patterns, gotchas. |
-| **`create_plan`** | *"Call tool `create_plan` for 'offline caching'"* | Generates phased architecture implementation plan. |
-| **`review_code`** | *"Call tool `review_code` on this code"* | Code review on code passed directly. |
-| **`generate_tests`** | *"Call tool `generate_tests` on this code"* | Generates unit & integration tests for code passed directly. |
-| **`explain_code`** | *"Call tool `explain_code` with code='...' and audience='junior'"* | Plain-English explanation: purpose, logic, patterns, non-obvious behaviors. Any language. |
-| **`ask_subagent`** | *"Call tool `ask_subagent` with prompt='...' and model='nvidia'"* | Offloads question/coding to any sub-agent model. |
-| **`benchmark_run`** | *"Claude, benchmark writing an LRU cache across nvidia and claude."* | Multi-model concurrent comparison. |
+| Tool | What It Does |
+| :--- | :--- |
+| **`review_file`** ⭐ | Zero-token: server reads the file itself → returns 🛡️ Code Review Report |
+| **`test_file`** ⭐ | Zero-token: server reads the file itself → generates production-ready tests |
+| **`explain_file`** ⭐ | Zero-token: server reads the file itself → returns 📖 plain-English explanation |
+| **`review_code`** | Code review on code passed directly in the prompt |
+| **`generate_tests`** | Unit & integration tests for code passed directly |
+| **`explain_code`** | Plain-English explanation for any code snippet (any language, any audience) |
+| **`create_plan`** | Generates a phased architectural implementation plan |
+| **`ask_subagent`** | Offloads any question or coding task to a specific sub-agent model |
+| **`delegate_task`** | Delegates to a specific runner or uses auto-routing |
+| **`benchmark_run`** | Runs a task across multiple models concurrently and compares results |
+| **`switch_model`** | Programmatically switch the active runner |
+| **`get_active_model`** | Returns the currently active runner info |
+| **`list_runners`** | Lists all registered runners and their metadata |
 
 ---
 
-## 📋 Copy-Paste Commands for Claude Code
+## 📋 Copy-Paste Prompts for Claude Code
 
-Just copy and paste these into your Claude Code terminal:
-
-### ⭐ Zero-Token File Explanation (`explain_file`)
+### ⭐ Zero-Token File Operations
 ```text
-Call tool explain_file with file_path='lib/services/auth_service.dart'
+Call tool review_file with file_path='lib/screens/login_screen.dart'
 ```
-
-### ⭐ Zero-Token File Explanation (For Junior / Senior Audience)
+```text
+Call tool test_file with file_path='lib/services/auth_service.dart'
+```
 ```text
 Call tool explain_file with file_path='lib/blocs/cart_bloc.dart' and audience='junior'
 ```
@@ -101,8 +122,9 @@ Call tool explain_file with file_path='lib/blocs/cart_bloc.dart' and audience='j
 Call tool explain_file with file_path='lib/blocs/cart_bloc.dart' and audience='senior'
 ```
 
-### 💡 Code Snippet Explanation (`explain_code`)
-Explain raw code or copied functions directly without needing a file on disk:
+> **Audiences**: `junior` | `mid-level` (default) | `senior` | `non-technical`
+
+### 💡 Code Snippet Explanation
 ```text
 Call tool explain_code with code='Future<void> sync() async { ... }' and audience='mid-level'
 ```
@@ -110,165 +132,186 @@ Call tool explain_code with code='Future<void> sync() async { ... }' and audienc
 Call tool explain_code with code='type UserState = { status: "idle" | "loading" };' and language='typescript' and audience='junior'
 ```
 
-> **Supported Audiences**:
-> - `junior`: Explains all patterns, terminology, and framework concepts in detail.
-> - `mid-level` (default): Focuses on design decisions, data flow, and non-obvious behaviors.
-> - `senior`: Terse technical overview covering architecture, complexity, and tradeoffs.
-> - `non-technical`: Plain-English analogies without code references.
-
-### ⭐ Zero-Token File Review (Generates 🛡️ Health Score Report!)
-```text
-Call tool review_file with file_path='lib/screens/login_screen.dart'
-```
-
-### ⭐ Zero-Token Test Generation
-```text
-Call tool test_file with file_path='lib/services/auth_service.dart'
-```
-
 ### 📐 Architecture Planning
 ```text
 Call tool create_plan for 'Offline SQLite caching in Flutter'
 ```
 
-### Ask NVIDIA Model Directly
+### 🤖 Ask a Specific Model
 ```text
 Call tool ask_subagent with prompt='Write a Flutter Riverpod StateNotifier for cart' and model='nvidia'
 ```
-
-### Ask Local Free Model ($0)
 ```text
 Call tool ask_subagent with prompt='Explain Dart Streams' and model='ollama'
 ```
 
-### Multi-Model Benchmark
+### 📊 Multi-Model Benchmark
 ```text
-Call tool benchmark_run with task='Write an LRU Cache in Dart' and runner_ids=['nemotron-3-super-120b-a12b', 'openrouter-claude-sonnet-4.5']
+Call tool benchmark_run with task='Write an LRU Cache in Dart' and runner_ids=['nvidia-llama-3.3-70b', 'openrouter-claude-sonnet-4.5']
 ```
 
 ---
 
 ## 🌐 Supported Backends & Models
 
-- **NVIDIA NIM & API Catalog** (`build.nvidia.com`): Nemotron 3 Super 120B, Llama 3.3 70B, Qwen Coder (`NVIDIA_API_KEY`)
-- **OpenRouter Cloud**: Claude Sonnet 4.5, DeepSeek V3 (`OPENROUTER_API_KEY`)
-- **Anthropic Direct API**: Claude 3.7 Sonnet, Claude 3.5 Haiku (`ANTHROPIC_API_KEY`)
-- **OpenAI Direct API**: GPT-4o, GPT-4o-mini (`OPENAI_API_KEY`)
-- **Local Ollama**: Qwen 2.5 Coder, Llama 3.2, DeepSeek-R1 (100% Free & Offline)
+| Provider | Models | Env Variable |
+| :--- | :--- | :--- |
+| **NVIDIA NIM** | Nemotron 3 Super 120B, Llama 3.3 70B, Qwen Coder, DeepSeek R1 | `NVIDIA_API_KEY` |
+| **OpenRouter** | Claude Sonnet 4.5, Qwen Coder (free), DeepSeek V3 | `OPENROUTER_API_KEY` |
+| **Anthropic Direct** | Claude 3.7 Sonnet, Claude 3.5 Haiku | `ANTHROPIC_API_KEY` |
+| **OpenAI Direct** | GPT-4o, GPT-4o-mini | `OPENAI_API_KEY` |
+| **Local Ollama** | Qwen 2.5 Coder, Llama 3.2, DeepSeek-R1 | *(none — free & offline)* |
 
 ---
 
-## 📁 Modular Configuration Structure
+## 📁 Project Structure
 
-Configurations and system prompts are cleanly isolated into dedicated files:
-
-```text
+```
 SmartRelay/
-├── config.yaml               ← Main server entrypoint (uses includes:)
+├── src/
+│   ├── server.ts          ← MCP stdio server (13 tools registered)
+│   ├── http-api.ts        ← Fastify HTTP API (for MCPHub plugin)
+│   ├── router.ts          ← TaskRouter with intent classification
+│   ├── tools/
+│   │   └── handlers.ts    ← All tool implementations
+│   ├── runners/           ← Anthropic, OpenAI, NVIDIA, Ollama, OpenRouter
+│   ├── benchmark/         ← BenchmarkEngine + scorers
+│   ├── logger.ts
+│   └── util.ts
+├── plugin-smartrelay/     ← MCPHub plugin (standalone, uploadable)
+│   └── src/index.ts       ← SmartRelayPlugin class
 ├── config/
 │   └── runners/
-│       ├── agents.yaml       ← Specialized agents (code-review, planner, test-generator, explain-agent)
-│       ├── nvidia.yaml       ← NVIDIA NIM models
-│       ├── openrouter.yaml   ← OpenRouter Cloud models
-│       ├── ollama.yaml       ← Local offline Ollama models
-│       ├── anthropic.yaml    ← Anthropic Direct API models
-│       └── openai.yaml       ← OpenAI Direct API models
-└── prompts/
-    ├── code_review.md        ← Code review prompt & Flutter verification vectors
-    ├── explain_code.md       ← Code explanation & knowledge transfer prompt
-    ├── planner.md            ← Architecture & planning prompt
-    └── test_generator.md     ← QA & test generation prompt
+│       ├── agents.yaml    ← Specialized agents (planner, reviewer, etc.)
+│       ├── nvidia.yaml
+│       ├── openrouter.yaml
+│       ├── ollama.yaml
+│       ├── anthropic.yaml
+│       └── openai.yaml
+├── config.yaml            ← Main config (includes all runner files)
+├── prompts/               ← System prompts for each agent role
+│   ├── code_review.md
+│   ├── explain_code.md
+│   ├── planner.md
+│   └── test_generator.md
+└── tests/                 ← 39 Vitest tests
 ```
 
 ---
 
-## 🚀 Quick Setup Guide (Self-hosted / Development)
+## 🚀 Quick Setup Guide (Development / Self-hosted)
 
-### 1. Clone & Install Dependencies
+### 1. Clone & Install
+
 ```bash
-# 1. Clone the repository
 git clone https://github.com/DhavanBhalodiya/smart-relay
 cd smart-relay
-
-# 2. Install Node dependencies
 npm install
-
-# 3. Build TypeScript bundle
-npm run build
 ```
 
-### 2. Configure Environment Variables (`.env`)
-Copy the example environment file and add your API keys:
+### 2. Configure Environment Variables
+
 ```bash
 cp .env.example .env
 ```
-Edit `.env`:
+
+Edit `.env` and add your API keys:
+
 ```bash
+ANTHROPIC_API_KEY=sk-ant-api03-...
+OPENAI_API_KEY=sk-proj-...
 OPENROUTER_API_KEY=sk-or-v1-...
 NVIDIA_API_KEY=nvapi-...
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-SMARTRELAY_HTTP_API_KEY=your-http-secret-key # For Fastify HTTP API
+
+# For HTTP API / MCPHub plugin
+SMARTRELAY_HTTP_API_KEY=your-secure-bearer-token-here
 ```
 
-### 3. Connect to Your AI Client
+> You only need keys for the providers you want to use. Ollama works with no key (free, local).
 
-SmartRelay adheres to the official **Model Context Protocol (MCP)** standard over `stdio`, meaning it works with any MCP-compatible agent or IDE.
+### 3. Build
+
+```bash
+npm run build
+```
+
+### 4. Connect to Your AI Client
+
+> 💡 **Tip — Finding your absolute path**:
+> Run `pwd` (macOS/Linux) or `echo %cd%` (Windows) in your `smart-relay` folder to find your `/ABSOLUTE/PATH/TO/smart-relay`.
+>
+> ⚠️ **Important (GUI Apps & Node PATH)**:
+> GUI applications (Claude Desktop, Cursor) on macOS and Linux often do not inherit shell environment variables like `PATH`. If you get `spawn node ENOENT` or `Connection failed`:
+> - Run `which node` in your terminal (e.g. `/opt/homebrew/bin/node` or `/usr/local/bin/node`).
+> - Use that exact full path instead of `"command": "node"`.
 
 #### 🟣 Claude Code (CLI)
-Run this command from inside the `SmartRelay` project root directory:
+
+Run from your terminal inside your `smart-relay` directory:
 ```bash
-claude mcp add smartrelay -- node $(pwd)/dist/server.js --config $(pwd)/config.yaml
+claude mcp add smartrelay -- node $(pwd)/dist/server.js
 ```
-- Verify: `claude mcp list`
-- Remove: `claude mcp remove smartrelay`
+*Or from any project directory using your absolute path:*
+```bash
+claude mcp add smartrelay -- node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js
+```
+Verify: `claude mcp list` | Remove: `claude mcp remove smartrelay`
 
-#### 🔵 Cursor IDE
-1. Go to **Settings** ➔ **Features** ➔ **MCP**
-2. Click **+ Add New MCP Server**
-3. Set:
-   - **Name**: `smartrelay`
-   - **Type**: `command`
-   - **Command**: `node /ABSOLUTE/PATH/TO/SmartRelay/dist/server.js --config /ABSOLUTE/PATH/TO/SmartRelay/config.yaml`
+#### 🟠 Claude Desktop
 
-#### 🌊 Windsurf / Codeium
-Add the following to `~/.codeium/windsurf/mcp_config.json`:
+Config file locations:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
 ```json
 {
   "mcpServers": {
     "smartrelay": {
       "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/SmartRelay/dist/server.js", "--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
+      "args": ["/ABSOLUTE/PATH/TO/smart-relay/dist/server.js"],
+      "env": {
+        "OPENAI_API_KEY": "sk-proj-...",
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "NVIDIA_API_KEY": "nvapi-...",
+        "OPENROUTER_API_KEY": "sk-or-v1-..."
+      }
     }
   }
 }
 ```
+*(Note: If you already configured `.env` inside the `smart-relay` repository, the `"env"` block above is optional — SmartRelay auto-detects it!)*
 
-#### 🟠 Claude Desktop
-Add to your `claude_desktop_config.json` (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+#### 🔵 Cursor IDE
+
+Go to **Settings → Features → MCP → + Add New MCP Server**:
+- **Name**: `smartrelay`
+- **Type**: `command`
+- **Command**: `node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js`
+
+#### 🌊 Windsurf / Codeium
+
+Edit `~/.codeium/windsurf/mcp_config.json`:
 ```json
 {
   "mcpServers": {
     "smartrelay": {
       "command": "node",
-      "args": [
-        "/ABSOLUTE/PATH/TO/SmartRelay/dist/server.js",
-        "--config",
-        "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"
-      ]
+      "args": ["/ABSOLUTE/PATH/TO/smart-relay/dist/server.js"]
     }
   }
 }
 ```
 
 #### 🟢 VS Code (Cline / Roo Code)
-In your Cline MCP settings (`cline_mcp_settings.json`):
+
+Edit your Cline MCP settings (`cline_mcp_settings.json`):
 ```json
 {
   "mcpServers": {
     "smartrelay": {
       "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/SmartRelay/dist/server.js", "--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
+      "args": ["/ABSOLUTE/PATH/TO/smart-relay/dist/server.js"]
     }
   }
 }
@@ -278,57 +321,94 @@ In your Cline MCP settings (`cline_mcp_settings.json`):
 
 ## 🧪 Testing & Verification
 
-Run the full automated test suite (39 unit and integration tests):
+### Run all 39 automated tests
 ```bash
 npm test
 ```
 
-Quick manual test via CLI:
+### TypeScript type check
 ```bash
-# Test NVIDIA model
-npm run quick-test -- "Say hello" --runner nemotron-3-super-120b-a12b
-
-# Test Explainer Agent
-npm run quick-test -- "Explain how a BLoC state stream works in Dart" --runner explain-agent
-
-# Test Planner Agent
-npm run quick-test -- "Plan a biometric auth flow in Flutter" --runner planner-agent
-
-# List all active runners
-npm run quick-test -- --list
+npm run typecheck
 ```
 
-Run Fastify HTTP API server:
+### Plugin conformance test (MCPHub)
 ```bash
+npm run test:plugin
+```
+
+### Quick manual CLI test
+```bash
+# List all registered runners
+npm run quick-test -- --list
+
+# Test a specific runner
+npm run quick-test -- "Say hello" --runner nvidia-llama-3.3-70b
+
+# Test local Ollama (free)
+npm run quick-test -- "Explain Dart Streams" --runner ollama-llama3.2
+```
+
+### Start HTTP API server (for MCPHub plugin)
+```bash
+export SMARTRELAY_HTTP_API_KEY=my-secret-token
 npm run start:http
+# → http://127.0.0.1:8000
+```
+
+Test HTTP endpoints:
+```bash
+curl -H "Authorization: Bearer my-secret-token" http://127.0.0.1:8000/v1/health
+curl -H "Authorization: Bearer my-secret-token" http://127.0.0.1:8000/v1/runners
 ```
 
 ---
 
-## 🌐 Web UI — MCP Inspector (Browse & Test Tools in Browser)
+## 🌐 MCP Inspector — Visual Browser UI
 
-You can visually browse, test, and interact with all MCP tools directly in your browser using the official **MCP Inspector**.
+Browse and run all 13 tools interactively in your browser:
 
-### Launch the Web UI
 ```bash
+npm run build
 npx -y @modelcontextprotocol/inspector node dist/server.js
 ```
 
-This will open the MCP Inspector at **http://localhost:6274** in your browser automatically.
+Opens at **http://localhost:6274**
 
-### How to Use
-1. Click **"Connect"** to connect to the MCP server
-2. Click the **"Tools"** tab to see all 11 registered tools
-3. Click any tool (e.g. `review_file`, `explain_code`, `benchmark_run`) to open its interactive form
-4. Fill in the parameters and click **"Run Tool"** to execute it live
-5. View the structured response directly in the browser
-
-### Available Tabs
-| Tab | What's Inside |
+| Tab | What's inside |
 | :--- | :--- |
-| **Tools** | All 11 tools with interactive parameter forms — fill & run instantly |
-| **Resources** | Any resources the server exposes |
-| **Prompts** | Prompt templates registered by the server |
+| **Tools** | All 13 tools with interactive forms — fill in params and run live |
+| **Resources** | Resources exposed by the server |
+| **Prompts** | Prompt templates |
 
-> **Tip**: This is the fastest way to verify your tools are working, test different parameters, and debug responses without needing Claude Code.
+> Fastest way to verify everything works without needing Claude Code or any AI client.
 
+---
+
+## 🔧 npm Scripts Reference
+
+| Script | Command | What it does |
+| :--- | :--- | :--- |
+| `npm run build` | `tsc` | Compile TypeScript → `dist/` |
+| `npm run dev` | `tsx src/server.ts` | Run MCP server (dev mode, no build needed) |
+| `npm run dev:http` | `tsx src/http-api.ts` | Run HTTP API server (dev mode) |
+| `npm start` | `node dist/server.js` | Run compiled MCP server |
+| `npm run start:http` | `node dist/http-api.js` | Run compiled HTTP API |
+| `npm test` | `vitest run` | Run 39 automated tests |
+| `npm run typecheck` | `tsc --noEmit` | TypeScript type check only |
+| `npm run test:plugin` | `tsx scripts/test-plugin.ts` | MCPHub plugin conformance test |
+| `npm run quick-test` | `tsx scripts/quick-test.ts` | Manual CLI runner test |
+
+---
+
+## 🔒 Security Notes
+
+- API keys are read from environment variables only — never hardcoded
+- The HTTP API requires a Bearer token (`SMARTRELAY_HTTP_API_KEY`)
+- The MCP stdio server is local-only (no network exposure)
+- No `process.exit()` calls — uses `process.exitCode` for safe shutdown
+
+---
+
+## 📄 License
+
+MIT — See [LICENSE](./LICENSE)
