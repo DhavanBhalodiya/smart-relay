@@ -5,9 +5,51 @@
 [![MCP Standard](https://img.shields.io/badge/MCP-Standard-blue.svg)](https://modelcontextprotocol.io)
 [![Context](https://img.shields.io/badge/Context-Zero--Token-green.svg)](#-1-click-dedicated-tools)
 [![Fleet](https://img.shields.io/badge/Fleet-NVIDIA%20%7C%20Claude%20%7C%20Ollama%20%7C%20OpenAI-orange.svg)](#-natural-language-model-switching)
-[![Tests](https://img.shields.io/badge/Tests-33%20Passing-brightgreen.svg)](#-testing--verification)
+[![Tests](https://img.shields.io/badge/Tests-39%20Passing-brightgreen.svg)](#-testing--verification)
+[![npm](https://img.shields.io/badge/npm-smartrelay-red.svg)](https://www.npmjs.com/package/smartrelay)
 
-**SmartRelay** is a high-performance Model Context Protocol (MCP) server built with Python and the official `mcp` SDK. It transforms **Claude Code** and other agentic IDEs into a **Master Orchestrator**—delegating heavy tasks (code reviews, test generation, explanations, architecture planning) to specialized sub-agents (NVIDIA NIM, Claude Sonnet 4.5, GPT-4o, local Ollama) with **zero context-window bloat** and concurrent multi-model benchmarking.
+**SmartRelay** is a high-performance Model Context Protocol (MCP) server built with TypeScript and the official `@modelcontextprotocol/server` SDK. It transforms **Claude Code** and other agentic IDEs into a **Master Orchestrator**—delegating heavy tasks (code reviews, test generation, explanations, architecture planning) to specialized sub-agents (NVIDIA NIM, Claude Sonnet 4.5, GPT-4o, local Ollama) with **zero context-window bloat** and concurrent multi-model benchmarking.
+
+---
+
+## 🚀 For Other Users — Quick Install (3 Options)
+
+### Option A — `npx` (No install, no clone)
+Add to your AI client config and restart. SmartRelay runs on demand via `npx`:
+```json
+{
+  "mcpServers": {
+    "smartrelay": {
+      "command": "npx",
+      "args": ["-y", "smartrelay"],
+      "env": {
+        "OPENAI_API_KEY": "sk-...",
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "NVIDIA_API_KEY": "nvapi-..."
+      }
+    }
+  }
+}
+```
+> Works in: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code (Cline)
+
+### Option B — Clone from GitHub
+```bash
+git clone https://github.com/DhavanBhalodiya/smart-relay
+cd smart-relay
+npm install && npm run build
+cp .env.example .env   # Add your API keys
+```
+Then point your MCP client at `dist/server.js` (see [Connect to Your AI Client](#3-connect-to-your-ai-client) below).
+
+### Option C — Browser Test Drive (MCP Inspector UI)
+```bash
+# From inside the SmartRelay project directory:
+cd /path/to/smart-relay
+npm run build   # one-time build step
+npx -y @modelcontextprotocol/inspector node dist/server.js
+```
+Opens a visual tool browser at **http://localhost:6274** — test all 18 tools right in your browser.
 
 ---
 
@@ -140,20 +182,19 @@ SmartRelay/
 
 ---
 
-## 🚀 Quick Setup Guide
+## 🚀 Quick Setup Guide (Self-hosted / Development)
 
 ### 1. Clone & Install Dependencies
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/SmartRelay.git
-cd SmartRelay
+git clone https://github.com/DhavanBhalodiya/smart-relay
+cd smart-relay
 
-# 2. Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+# 2. Install Node dependencies
+npm install
 
-# 3. Install in editable mode
-pip install -e ".[dev]"
+# 3. Build TypeScript bundle
+npm run build
 ```
 
 ### 2. Configure Environment Variables (`.env`)
@@ -167,6 +208,7 @@ OPENROUTER_API_KEY=sk-or-v1-...
 NVIDIA_API_KEY=nvapi-...
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
+SMARTRELAY_HTTP_API_KEY=your-http-secret-key # For Fastify HTTP API
 ```
 
 ### 3. Connect to Your AI Client
@@ -176,7 +218,7 @@ SmartRelay adheres to the official **Model Context Protocol (MCP)** standard ove
 #### 🟣 Claude Code (CLI)
 Run this command from inside the `SmartRelay` project root directory:
 ```bash
-claude mcp add smartrelay -- $(pwd)/.venv/bin/python -m mcp_delegation_server.server --config $(pwd)/config.yaml
+claude mcp add smartrelay -- node $(pwd)/dist/server.js --config $(pwd)/config.yaml
 ```
 - Verify: `claude mcp list`
 - Remove: `claude mcp remove smartrelay`
@@ -187,7 +229,7 @@ claude mcp add smartrelay -- $(pwd)/.venv/bin/python -m mcp_delegation_server.se
 3. Set:
    - **Name**: `smartrelay`
    - **Type**: `command`
-   - **Command**: `/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay --config /ABSOLUTE/PATH/TO/SmartRelay/config.yaml`
+   - **Command**: `node /ABSOLUTE/PATH/TO/SmartRelay/dist/server.js --config /ABSOLUTE/PATH/TO/SmartRelay/config.yaml`
 
 #### 🌊 Windsurf / Codeium
 Add the following to `~/.codeium/windsurf/mcp_config.json`:
@@ -195,8 +237,8 @@ Add the following to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "smartrelay": {
-      "command": "/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay",
-      "args": ["--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/SmartRelay/dist/server.js", "--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
     }
   }
 }
@@ -208,8 +250,9 @@ Add to your `claude_desktop_config.json` (`~/Library/Application Support/Claude/
 {
   "mcpServers": {
     "smartrelay": {
-      "command": "/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay",
+      "command": "node",
       "args": [
+        "/ABSOLUTE/PATH/TO/SmartRelay/dist/server.js",
         "--config",
         "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"
       ]
@@ -224,8 +267,8 @@ In your Cline MCP settings (`cline_mcp_settings.json`):
 {
   "mcpServers": {
     "smartrelay": {
-      "command": "/ABSOLUTE/PATH/TO/SmartRelay/.venv/bin/smartrelay",
-      "args": ["--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/SmartRelay/dist/server.js", "--config", "/ABSOLUTE/PATH/TO/SmartRelay/config.yaml"]
     }
   }
 }
@@ -235,24 +278,29 @@ In your Cline MCP settings (`cline_mcp_settings.json`):
 
 ## 🧪 Testing & Verification
 
-Run the full automated test suite (33 unit and integration tests):
+Run the full automated test suite (39 unit and integration tests):
 ```bash
-.venv/bin/pytest -v
+npm test
 ```
 
 Quick manual test via CLI:
 ```bash
 # Test NVIDIA model
-.venv/bin/python scripts/quick_test.py "Say hello" --runner nemotron-3-super-120b-a12b
+npm run quick-test -- "Say hello" --runner nemotron-3-super-120b-a12b
 
 # Test Explainer Agent
-.venv/bin/python scripts/quick_test.py "Explain how a BLoC state stream works in Dart" --runner explain-agent
+npm run quick-test -- "Explain how a BLoC state stream works in Dart" --runner explain-agent
 
 # Test Planner Agent
-.venv/bin/python scripts/quick_test.py "Plan a biometric auth flow in Flutter" --runner planner-agent
+npm run quick-test -- "Plan a biometric auth flow in Flutter" --runner planner-agent
 
 # List all active runners
-.venv/bin/python scripts/quick_test.py --list
+npm run quick-test -- --list
+```
+
+Run Fastify HTTP API server:
+```bash
+npm run start:http
 ```
 
 ---
@@ -263,7 +311,7 @@ You can visually browse, test, and interact with all MCP tools directly in your 
 
 ### Launch the Web UI
 ```bash
-npx -y @modelcontextprotocol/inspector .venv/bin/smartrelay --config config.yaml
+npx -y @modelcontextprotocol/inspector node dist/server.js
 ```
 
 This will open the MCP Inspector at **http://localhost:6274** in your browser automatically.
