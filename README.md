@@ -2,6 +2,7 @@
 
 > **The intelligent delegation layer & zero-token task server for AI agents.**
 
+[![npm version](https://img.shields.io/npm/v/@theone1345/smartrelay.svg)](https://www.npmjs.com/package/@theone1345/smartrelay)
 [![MCP Standard](https://img.shields.io/badge/MCP-Standard-blue.svg)](https://modelcontextprotocol.io)
 [![TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178C6.svg)](https://www.typescriptlang.org)
 [![Tests](https://img.shields.io/badge/Tests-39%20Passing-brightgreen.svg)](#-testing--verification)
@@ -23,9 +24,33 @@ Before installing, ensure you have:
 
 ## 🚀 Quick Install
 
-### Method 1 — Global Command (`npm link`) *(Recommended — easiest & cleanest)*
+### Option A — `npx` *(Easiest — zero install, runs everywhere)*
 
-Creates a system-wide `smartrelay` command on your computer so you don't need to configure long file paths in your AI clients:
+Add directly to your Claude Desktop / Cursor / Windsurf configuration:
+
+```json
+{
+  "mcpServers": {
+    "smartrelay": {
+      "command": "npx",
+      "args": ["-y", "@theone1345/smartrelay"],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-...",
+        "NVIDIA_API_KEY": "nvapi-..."
+      }
+    }
+  }
+}
+```
+
+Or in **Claude Code CLI** (one single command from anywhere):
+```bash
+claude mcp add -s user smartrelay -- npx -y @theone1345/smartrelay
+```
+
+---
+
+### Option B — Clone & Link (`npm link`) *(For developers customizing code)*
 
 ```bash
 git clone https://github.com/DhavanBhalodiya/smart-relay.git
@@ -36,25 +61,14 @@ npm link
 cp .env.example .env   # fill in your API keys
 ```
 
-Now connect it in one simple command from any terminal:
+Now connect it via the global `smartrelay` command:
 ```bash
 claude mcp add -s user smartrelay -- smartrelay
 ```
 
-Or in Claude Desktop / Cursor:
-```json
-{
-  "mcpServers": {
-    "smartrelay": {
-      "command": "smartrelay"
-    }
-  }
-}
-```
-
 ---
 
-### Method 2 — Direct Path (Standard Setup)
+### Option C — Direct Path Execution
 
 If you prefer not linking globally, simply point your AI client to the compiled `dist/server.js`:
 
@@ -266,13 +280,12 @@ npm run build
 
 #### 🟣 Claude Code (CLI)
 
-To make SmartRelay available across **all your projects** (e.g. Flutter apps in `Documents`):
-
+Add globally across **all projects** with a single command:
 ```bash
-claude mcp add -s user smartrelay -- node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js
+claude mcp add -s user smartrelay -- npx -y @theone1345/smartrelay
 ```
 
-> **Note**: The `-s user` flag installs it globally for your user account so it works inside any folder or project. Omit `-s user` only if you want it scoped to the current directory only.
+*(Or if you are running locally from source: `claude mcp add -s user smartrelay -- node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js`)*
 
 Verify anywhere: `claude mcp list` | Remove: `claude mcp remove -s user smartrelay`
 
@@ -287,26 +300,27 @@ Config file locations:
 {
   "mcpServers": {
     "smartrelay": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/smart-relay/dist/server.js"],
+      "command": "npx",
+      "args": ["-y", "@theone1345/smartrelay"],
       "env": {
-        "OPENAI_API_KEY": "sk-proj-...",
-        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "OPENROUTER_API_KEY": "sk-or-v1-...",
         "NVIDIA_API_KEY": "nvapi-...",
-        "OPENROUTER_API_KEY": "sk-or-v1-..."
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "OPENAI_API_KEY": "sk-proj-..."
       }
     }
   }
 }
 ```
-*(Note: If you already configured `.env` inside the `smart-relay` repository, the `"env"` block above is optional — SmartRelay auto-detects it!)*
 
 #### 🔵 Cursor IDE
 
 Go to **Settings → Features → MCP → + Add New MCP Server**:
 - **Name**: `smartrelay`
 - **Type**: `command`
-- **Command**: `node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js`
+- **Command**: `npx -y @theone1345/smartrelay`
+
+*(Or if running locally: `/opt/homebrew/bin/node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js`)*
 
 #### 🌊 Windsurf / Codeium
 
@@ -315,8 +329,12 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "smartrelay": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/smart-relay/dist/server.js"]
+      "command": "npx",
+      "args": ["-y", "@theone1345/smartrelay"],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-...",
+        "NVIDIA_API_KEY": "nvapi-..."
+      }
     }
   }
 }
@@ -329,8 +347,12 @@ Edit your Cline MCP settings (`cline_mcp_settings.json`):
 {
   "mcpServers": {
     "smartrelay": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/smart-relay/dist/server.js"]
+      "command": "npx",
+      "args": ["-y", "@theone1345/smartrelay"],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-...",
+        "NVIDIA_API_KEY": "nvapi-..."
+      }
     }
   }
 }
