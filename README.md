@@ -23,7 +23,40 @@ Before installing, ensure you have:
 
 ## 🚀 Quick Install
 
-### Option A — Clone & Build *(Recommended — works immediately)*
+### Method 1 — Global Command (`npm link`) *(Recommended — easiest & cleanest)*
+
+Creates a system-wide `smartrelay` command on your computer so you don't need to configure long file paths in your AI clients:
+
+```bash
+git clone https://github.com/DhavanBhalodiya/smart-relay.git
+cd smart-relay
+npm install
+npm run build
+npm link
+cp .env.example .env   # fill in your API keys
+```
+
+Now connect it in one simple command from any terminal:
+```bash
+claude mcp add -s user smartrelay -- smartrelay
+```
+
+Or in Claude Desktop / Cursor:
+```json
+{
+  "mcpServers": {
+    "smartrelay": {
+      "command": "smartrelay"
+    }
+  }
+}
+```
+
+---
+
+### Method 2 — Direct Path (Standard Setup)
+
+If you prefer not linking globally, simply point your AI client to the compiled `dist/server.js`:
 
 ```bash
 git clone https://github.com/DhavanBhalodiya/smart-relay.git
@@ -33,32 +66,11 @@ npm run build
 cp .env.example .env   # fill in your API keys
 ```
 
-> **Optional (CLI shortcut)**: Run `npm link` inside the directory to make the `smartrelay` command available anywhere on your machine.
+Then point your editor to `node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js` — see [Connect to Your AI Client](#4-connect-to-your-ai-client) below.
 
-Now connect it to your editor — see [Connect to Your AI Client](#4-connect-to-your-ai-client) below.
+---
 
-### Option B — `npx` *(available once published to npm registry)*
-
-Add directly to your Claude Desktop / Cursor / Windsurf MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "smartrelay": {
-      "command": "npx",
-      "args": ["-y", "smartrelay"],
-      "env": {
-        "OPENAI_API_KEY": "sk-...",
-        "ANTHROPIC_API_KEY": "sk-ant-...",
-        "NVIDIA_API_KEY": "nvapi-...",
-        "OPENROUTER_API_KEY": "sk-or-v1-..."
-      }
-    }
-  }
-}
-```
-
-### Option C — Browser Test Drive (MCP Inspector)
+### Method 3 — Browser Test Drive (MCP Inspector)
 
 Test all 13 tools interactively in your browser with zero editor configuration:
 
@@ -254,15 +266,15 @@ npm run build
 
 #### 🟣 Claude Code (CLI)
 
-Run from your terminal inside your `smart-relay` directory:
+To make SmartRelay available across **all your projects** (e.g. Flutter apps in `Documents`):
+
 ```bash
-claude mcp add smartrelay -- node $(pwd)/dist/server.js
+claude mcp add -s user smartrelay -- node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js
 ```
-*Or from any project directory using your absolute path:*
-```bash
-claude mcp add smartrelay -- node /ABSOLUTE/PATH/TO/smart-relay/dist/server.js
-```
-Verify: `claude mcp list` | Remove: `claude mcp remove smartrelay`
+
+> **Note**: The `-s user` flag installs it globally for your user account so it works inside any folder or project. Omit `-s user` only if you want it scoped to the current directory only.
+
+Verify anywhere: `claude mcp list` | Remove: `claude mcp remove -s user smartrelay`
 
 #### 🟠 Claude Desktop
 
