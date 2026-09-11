@@ -1,11 +1,31 @@
 {
-  "name": "smartrelay",
+  "name": "@theone1345/smartrelay",
   "version": "0.2.0",
   "description": "MCP server for delegating tasks across LLM backends and benchmarking their outputs",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
+  "author": "Dhavan Bhalodiya",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DhavanBhalodiya/smart-relay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DhavanBhalodiya/smart-relay/issues"
+  },
+  "homepage": "https://github.com/DhavanBhalodiya/smart-relay#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "cursor",
+    "windsurf",
+    "subagents",
+    "openrouter",
+    "nvidia",
+    "ollama"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -21,6 +41,7 @@
     "prompts"
   ],
   "scripts": {
+    "prepublishOnly": "npm run build && npm test",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/server.ts",
