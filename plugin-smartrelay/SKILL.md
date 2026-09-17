@@ -10,7 +10,7 @@ SmartRelay is a unified delegation and benchmarking layer for AI-driven coding t
 - `smartrelay_configure` — Set up API endpoint and authentication
 - `smartrelay_status` — Check plugin health and configuration
 - `smartrelay_remove` — Uninstall the plugin
-- `smartrelay_health_check` — Deep health check of the remote service
+- `smartrelay_health_check` — Check that the configured keys authenticate at least one runner
 - `smartrelay_get_logs` — Retrieve activity logs
 
 ### Model & Runner Management

@@ -57,32 +57,89 @@ export function findProjectRoot(startDir: string = import.meta.dirname): string 
 }
 
 /**
- * Load variables from the first `.env` found in the current directory or the
- * project root. Existing environment variables always win.
+ * Directory holding SmartRelay's user-level state, `~/.smartrelay` by default.
+ *
+ * `SMARTRELAY_HOME` overrides it so tests can redirect the credential file to a
+ * temp dir without ever touching the developer's real home directory.
+ */
+export function smartrelayHome(override?: string): string {
+  if (override) return override;
+  const fromEnv = process.env['SMARTRELAY_HOME'];
+  if (fromEnv) return resolveUserPath(fromEnv);
+  return path.join(homedir(), '.smartrelay');
+}
+
+/** The global credential file written by `smartrelay setup`. */
+export function globalEnvPath(homeOverride?: string): string {
+  return path.join(smartrelayHome(homeOverride), '.env');
+}
+
+/**
+ * Parse `.env` text into ordered key/value pairs.
+ *
+ * A `Map` rather than a plain object: insertion order is preserved and a key
+ * literally named `__proto__` cannot poison a prototype.
  *
  * Deliberately hand-rolled rather than delegating to a dotenv package so the
- * quote-stripping and precedence behavior stays identical to the Python original.
+ * quote-stripping behavior stays identical to the Python original. The setup
+ * wizard reuses this so the writer and the loader can never disagree about it.
  */
-export function loadDotEnv(): void {
-  const candidates = [path.join(process.cwd(), '.env'), path.join(findProjectRoot(), '.env')];
+export function parseEnvText(text: string): Map<string, string> {
+  const parsed = new Map<string, string>();
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
 
+    const splitAt = line.indexOf('=');
+    const key = line.slice(0, splitAt).trim();
+    const value = stripChar(stripChar(line.slice(splitAt + 1).trim(), "'"), '"');
+
+    if (key) parsed.set(key, value);
+  }
+  return parsed;
+}
+
+/**
+ * Populate `process.env` from the `.env` files SmartRelay knows about.
+ *
+ * Precedence, highest first:
+ *   1. variables already in `process.env`
+ *   2. `<cwd>/.env`               — project-local
+ *   3. `<project root>/.env`
+ *   4. `~/.smartrelay/.env`       — written by `smartrelay setup`
+ *
+ * Every candidate is read, not just the first that exists: the global file is a
+ * fallback for keys a project never defines. Since the assignment below only
+ * fills in names that are still unset, reading the list in order produces that
+ * precedence for free.
+ *
+ * `cwd`/`home` exist only so tests can point at temp directories — `process.chdir`
+ * is process-global and unsafe across parallel test files.
+ */
+export function loadDotEnv(options?: { cwd?: string; home?: string }): void {
+  const candidates = [
+    path.join(options?.cwd ?? process.cwd(), '.env'),
+    path.join(findProjectRoot(), '.env'),
+  ];
+  // Escape hatch for the test suite, which must never read a developer's real
+  // credentials just because `server.ts` calls this at module scope.
+  if (process.env['SMARTRELAY_SKIP_GLOBAL_ENV'] !== '1') {
+    candidates.push(globalEnvPath(options?.home));
+  }
+
+  const seen = new Set<string>();
   for (const envFile of candidates) {
-    if (!existsSync(envFile)) continue;
+    const resolved = path.resolve(envFile);
+    if (seen.has(resolved) || !existsSync(resolved)) continue;
+    seen.add(resolved);
+
     try {
-      for (const rawLine of readFileSync(envFile, 'utf-8').split(/\r?\n/)) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith('#') || !line.includes('=')) continue;
-
-        const splitAt = line.indexOf('=');
-        const key = line.slice(0, splitAt).trim();
-        const value = stripChar(stripChar(line.slice(splitAt + 1).trim(), "'"), '"');
-
-        if (key && !(key in process.env)) process.env[key] = value;
+      for (const [key, value] of parseEnvText(readFileSync(resolved, 'utf-8'))) {
+        if (!(key in process.env)) process.env[key] = value;
       }
     } catch {
       // Matches the Python original: a malformed .env is ignored, not fatal.
     }
-    break;
   }
 }
 

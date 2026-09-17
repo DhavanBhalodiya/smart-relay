@@ -91,6 +91,8 @@ const ROLE_SHORTCUTS: ReadonlyArray<readonly [keyword: string, runnerId: string]
   ['review', 'code-review-agent'],
   ['test', 'test-generator-agent'],
   ['explain', 'explain-agent'],
+  ['security', 'security-agent'],
+  ['audit', 'security-agent'],
 ];
 
 /** Preferred defaults, in priority order, when no `default_runner` is configured. */
@@ -109,8 +111,15 @@ const PLAN_KEYWORDS = [
   'implementation plan', 'strategy', 'phases', 'step-by-step plan',
 ] as const;
 
+const SECURITY_KEYWORDS = [
+  'security', 'vulnerability', 'cve', 'owasp', 'penetration',
+  'exploit', 'injection', 'xss', 'csrf', 'secret leak',
+  'hardcoded secret', 'auth flaw', 'privilege escalation',
+  'security audit', 'threat model', 'insecure',
+] as const;
+
 const REVIEW_KEYWORDS = [
-  'review', 'audit', 'critique', 'vulnerability', 'security',
+  'review', 'critique',
   'edge case', 'smell', 'refactor', 'race condition', 'memory leak',
   'optimize', 'performance issue', 'bug in', 'check this code',
 ] as const;
@@ -165,10 +174,11 @@ export class TaskRouter {
       '| **`Switch to nvidia`** | Nemotron 3 Super 120B (NVIDIA NIM) | Heavyweight Cloud Agent |',
       '| **`Switch to claude`** | Claude Sonnet 4.5 / 3.7 | Elite Code & Review |',
       '| **`Switch to ollama`** | Qwen 2.5 Coder (Local Ollama) | Free $0.00 Offline Runner |',
+      '| **`Switch to security`** | Nemotron 3 Super 120B (NVIDIA NIM) | Dedicated AppSec & Threat Auditor |',
       '| **`Switch to auto`** | Smart Intent Routing (default) | Automatic Agent Routing |',
       '| **`Switch to direct`** | Native Claude Intelligence | Bypass Sub-Agents |',
       '',
-      "💡 *Tip: Say 'Switch to deepseek', 'Switch to qwen', or 'Switch to openrouter' anytime.*",
+      "💡 *Tip: Say 'Switch to deepseek', 'Switch to security', or 'Switch to openrouter' anytime.*",
     ];
     return lines.join('\n');
   }
@@ -298,7 +308,13 @@ export class TaskRouter {
     const matches = (keywords: readonly string[]): boolean =>
       keywords.some((keyword) => taskLower.includes(keyword));
 
-    // 3. Planning / architecture intent.
+    // 3. Security audit intent.
+    if (matches(SECURITY_KEYWORDS)) {
+      const runner = this.registry.get('security-agent');
+      if (runner) return runner;
+    }
+
+    // 4. Planning / architecture intent.
     if (matches(PLAN_KEYWORDS)) {
       const runner = this.registry.get('planner-agent');
       if (runner) return runner;

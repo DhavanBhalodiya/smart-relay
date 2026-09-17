@@ -11,7 +11,7 @@ describe('MCP Server Tool Registration and Execution', () => {
   const registeredTools = (server as unknown as { _registeredTools: Record<string, RegisteredTool> })
     ._registeredTools;
 
-  it('registers all 13 core MCP tools', () => {
+  it('registers all 15 core MCP tools', () => {
     const expectedTools = [
       'switch_model',
       'get_active_model',
@@ -23,6 +23,8 @@ describe('MCP Server Tool Registration and Execution', () => {
       'test_file',
       'explain_code',
       'explain_file',
+      'audit_security',
+      'audit_file_security',
       'list_runners',
       'delegate_task',
       'benchmark_run',

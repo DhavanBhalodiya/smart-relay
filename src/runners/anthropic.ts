@@ -8,7 +8,7 @@ import Anthropic, {
   RateLimitError,
 } from '@anthropic-ai/sdk';
 
-import { BaseRunner, makeRunnerResult, resolveParams, type RunnerConfig, type RunnerResult } from './base.js';
+import { authErrorMessage, BaseRunner, makeRunnerResult, resolveParams, type RunnerConfig, type RunnerResult } from './base.js';
 import { describeError, startTimer } from '../util.js';
 
 /** Runner adapter for Anthropic Claude models via the official SDK. */
@@ -52,9 +52,7 @@ export class AnthropicRunner extends BaseRunner {
         task,
         latency_ms: elapsed(),
         success: false,
-        error_message:
-          `Authentication error: Environment variable '${this.envVarName}' is not set. ` +
-          `Please export ${this.envVarName}=<your-key> to use runner '${this.id}'.`,
+        error_message: authErrorMessage(this.envVarName, this.id),
       });
     }
 

@@ -6,7 +6,8 @@ import { parseArgs } from 'node:util';
 import { BenchmarkEngine } from '../src/benchmark/engine.js';
 import { TaskRouter } from '../src/router.js';
 import { RunnerRegistry } from '../src/runners/registry.js';
-import { benchmarkRun, delegateTask, listRunners } from '../src/tools/index.js';
+import { formatRunnerStatusLines } from '../src/credentials.js';
+import { benchmarkRun, delegateTask } from '../src/tools/index.js';
 import { loadDotEnv } from '../src/util.js';
 
 loadDotEnv();
@@ -34,19 +35,8 @@ async function main(): Promise<void> {
 
   if (values.list) {
     console.log('=== Registered LLM Runners & Agents ===');
-    const rawList = listRunners(registry);
-    const runners = JSON.parse(rawList) as Array<{
-      runner_id: string;
-      model: string;
-      is_authenticated: boolean;
-      pricing: { cost_per_million_input_tokens: number; cost_per_million_output_tokens: number };
-      credentials_env_var: string | null;
-    }>;
-
-    for (const r of runners) {
-      const auth = r.is_authenticated ? '🟢 AUTHENTICATED' : '🔴 MISSING_AUTH';
-      const cost = `$${r.pricing.cost_per_million_input_tokens}/$${r.pricing.cost_per_million_output_tokens} per M`;
-      console.log(`- ${r.runner_id.padEnd(30)} [${r.model}] ${auth.padEnd(20)} ${cost}`);
+    for (const line of formatRunnerStatusLines(registry.getRunnersMetadata())) {
+      console.log(line);
     }
     return;
   }

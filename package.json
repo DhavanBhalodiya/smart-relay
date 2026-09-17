@@ -1,10 +1,25 @@
 {
   "name": "@theone1345/smartrelay",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for delegating tasks across LLM backends and benchmarking their outputs",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./dispatch": {
+      "types": "./dist/tools/dispatch.d.ts",
+      "default": "./dist/tools/dispatch.js"
+    },
+    "./credentials": {
+      "types": "./dist/credentials.d.ts",
+      "default": "./dist/credentials.js"
+    },
+    "./package.json": "./package.json"
+  },
   "license": "MIT",
   "author": "Dhavan Bhalodiya",
   "repository": {
@@ -32,7 +47,8 @@
   "bin": {
     "smartrelay": "dist/server.js",
     "mcp-delegation-server": "dist/server.js",
-    "smartrelay-http": "dist/http-api.js"
+    "smartrelay-http": "dist/http-api.js",
+    "smartrelay-setup": "dist/setup.js"
   },
   "files": [
     "dist",
@@ -51,7 +67,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "quick-test": "tsx scripts/quick-test.ts",
-    "test:plugin": "tsx scripts/test-plugin.ts"
+    "test:plugin": "tsx scripts/test-plugin.ts",
+    "test:review": "tsx scripts/test-review.ts",
+    "setup": "tsx src/setup.ts",
+    "build:plugin": "npm --workspace plugin-smartrelay run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -66,5 +85,11 @@
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
+  },
+  "workspaces": [
+    "plugin-smartrelay"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

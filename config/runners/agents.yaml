@@ -19,8 +19,9 @@ runners:
     api_key_env: "NVIDIA_API_KEY"
     cost_per_million_input_tokens: 0.70
     cost_per_million_output_tokens: 0.90
+    timeout_seconds: 120.0
     default_params:
-      max_tokens: 4096
+      max_tokens: 16384
       temperature: 0.1
       system_prompt_file: "prompts/code_review.md"
 
@@ -45,3 +46,15 @@ runners:
       max_tokens: 4096
       temperature: 0.3
       system_prompt_file: "prompts/explain_code.md"
+
+  security-agent:
+    type: "nvidia"
+    model: "nvidia/nemotron-3-super-120b-a12b"
+    api_key_env: "NVIDIA_API_KEY"
+    cost_per_million_input_tokens: 0.70
+    cost_per_million_output_tokens: 0.90
+    timeout_seconds: 120.0
+    default_params:
+      max_tokens: 16384
+      temperature: 0.1
+      system_prompt_file: "prompts/security_audit.md"

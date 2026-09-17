@@ -13,72 +13,18 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 
-import { BenchmarkEngine } from './benchmark/engine.js';
+import { warnIfNoCredentials } from './credentials.js';
 import { getLogger } from './logger.js';
-import { TaskRouter } from './router.js';
-import { RunnerRegistry } from './runners/registry.js';
-import {
-  askSubagent,
-  benchmarkRun,
-  createPlan,
-  delegateTask,
-  explainCode,
-  explainFile,
-  generateTests,
-  getActiveModel,
-  listRunners,
-  pluginConfigure,
-  pluginGetLogs,
-  pluginHealthCheck,
-  pluginRemove,
-  pluginStatus,
-  reviewCode,
-  reviewFile,
-  switchModel,
-  testFile,
-} from './tools/index.js';
+import { dispatchTool, getRegistry } from './tools/dispatch.js';
 import { describeError, loadDotEnv } from './util.js';
+
+// Re-exported so existing importers of `http-api` keep resolving after the
+// dispatch logic moved to `tools/dispatch.ts`.
+export { createDispatchContext, dispatchTool, getEngine, getRegistry, getRouter } from './tools/dispatch.js';
 
 loadDotEnv();
 
 const logger = getLogger('smartrelay.http');
-
-let registryInstance: RunnerRegistry | null = null;
-let engineInstance: BenchmarkEngine | null = null;
-let routerInstance: TaskRouter | null = null;
-
-export function getRegistry(configPath?: string | null): RunnerRegistry {
-  if (!registryInstance) {
-    try {
-      registryInstance = RunnerRegistry.fromYaml(configPath);
-      logger.info(`Loaded runners: [${registryInstance.registeredIds().join(', ')}]`);
-    } catch (err) {
-      logger.warning(`Could not initialize registry on startup: ${err}`);
-      registryInstance = new RunnerRegistry(configPath ?? null);
-    }
-  } else {
-    registryInstance.reloadIfModified();
-  }
-  return registryInstance;
-}
-
-export function getEngine(): BenchmarkEngine {
-  const reg = getRegistry();
-  if (!engineInstance || engineInstance.registry !== reg) {
-    const rawConcurrency = reg.serverConfig['max_concurrency'];
-    const maxConcurrency = typeof rawConcurrency === 'number' ? rawConcurrency : 5;
-    engineInstance = new BenchmarkEngine(reg, maxConcurrency);
-  }
-  return engineInstance;
-}
-
-export function getRouter(): TaskRouter {
-  const reg = getRegistry();
-  if (!routerInstance || routerInstance.registry !== reg) {
-    routerInstance = new TaskRouter(reg);
-  }
-  return routerInstance;
-}
 
 // =========================================================================
 // AUTHENTICATION HOOK
@@ -115,143 +61,6 @@ export function verifyApiKey(request: FastifyRequest, reply: FastifyReply): void
     reply.header('WWW-Authenticate', 'Bearer');
     reply.status(401).send({ detail: 'Invalid API key' });
     return;
-  }
-}
-
-// =========================================================================
-// DISPATCH TOOLS
-// =========================================================================
-
-export async function dispatchTool(
-  toolName: string,
-  args: Record<string, unknown> = {},
-): Promise<unknown> {
-  const router = getRouter();
-  const registry = getRegistry();
-  const engine = getEngine();
-
-  // Normalize tool name (handle both smartrelay_* and plain tool names)
-  const norm = toolName.startsWith('smartrelay_') ? toolName : `smartrelay_${toolName}`;
-
-  switch (norm) {
-    // Plugin lifecycle
-    case 'smartrelay_configure':
-      return pluginConfigure(args);
-    case 'smartrelay_status':
-      return pluginStatus(registry);
-    case 'smartrelay_remove':
-      return pluginRemove();
-    case 'smartrelay_health_check':
-      return pluginHealthCheck(registry);
-    case 'smartrelay_get_logs':
-      return pluginGetLogs(args);
-
-    // Model switching
-    case 'smartrelay_switch_model': {
-      const model = typeof args['model'] === 'string' ? args['model'] : 'auto';
-      return switchModel(router, model);
-    }
-    case 'smartrelay_get_active_model':
-      return getActiveModel(router);
-
-    // Delegation tools
-    case 'smartrelay_create_plan': {
-      const goal = typeof args['goal'] === 'string' ? args['goal'] : '';
-      const context = typeof args['context'] === 'string' ? args['context'] : '';
-      if (!goal) return { error: 'Missing required argument: goal' };
-      return createPlan(router, goal, context);
-    }
-    case 'smartrelay_review_code': {
-      const code = typeof args['code'] === 'string' ? args['code'] : '';
-      const focus =
-        typeof args['focus'] === 'string'
-          ? args['focus']
-          : 'bugs, security, clean code, and performance';
-      if (!code) return { error: 'Missing required argument: code' };
-      return reviewCode(router, code, focus);
-    }
-    case 'smartrelay_generate_tests': {
-      const code = typeof args['code'] === 'string' ? args['code'] : '';
-      const framework =
-        typeof args['framework'] === 'string'
-          ? args['framework']
-          : 'standard unit test framework (pytest, flutter_test, etc.)';
-      if (!code) return { error: 'Missing required argument: code' };
-      return generateTests(router, code, framework);
-    }
-    case 'smartrelay_ask_subagent': {
-      const prompt = typeof args['prompt'] === 'string' ? args['prompt'] : '';
-      const model = typeof args['model'] === 'string' ? args['model'] : 'auto';
-      if (!prompt) return { error: 'Missing required argument: prompt' };
-      return askSubagent(router, prompt, model);
-    }
-    case 'smartrelay_review_file': {
-      const filePath = typeof args['file_path'] === 'string' ? args['file_path'] : '';
-      const focus =
-        typeof args['focus'] === 'string'
-          ? args['focus']
-          : 'bugs, security, clean code, and performance';
-      if (!filePath) return { error: 'Missing required argument: file_path' };
-      return reviewFile(router, filePath, focus);
-    }
-    case 'smartrelay_test_file': {
-      const filePath = typeof args['file_path'] === 'string' ? args['file_path'] : '';
-      const framework =
-        typeof args['framework'] === 'string'
-          ? args['framework']
-          : 'standard unit test framework (pytest, flutter_test, etc.)';
-      if (!filePath) return { error: 'Missing required argument: file_path' };
-      return testFile(router, filePath, framework);
-    }
-    case 'smartrelay_explain_code': {
-      const code = typeof args['code'] === 'string' ? args['code'] : '';
-      const audience = typeof args['audience'] === 'string' ? args['audience'] : 'mid-level engineer';
-      const language = typeof args['language'] === 'string' ? args['language'] : 'auto';
-      if (!code) return { error: 'Missing required argument: code' };
-      return explainCode(router, code, audience, language);
-    }
-    case 'smartrelay_explain_file': {
-      const filePath = typeof args['file_path'] === 'string' ? args['file_path'] : '';
-      const audience = typeof args['audience'] === 'string' ? args['audience'] : 'mid-level engineer';
-      if (!filePath) return { error: 'Missing required argument: file_path' };
-      return explainFile(router, filePath, audience);
-    }
-    case 'smartrelay_list_runners':
-      return listRunners(registry);
-    case 'smartrelay_delegate_task': {
-      const task = typeof args['task'] === 'string' ? args['task'] : '';
-      const runnerId = typeof args['runner_id'] === 'string' ? args['runner_id'] : 'auto';
-      const params =
-        typeof args['params'] === 'object' && args['params'] !== null
-          ? (args['params'] as Record<string, unknown>)
-          : undefined;
-      if (!task) return { error: 'Missing required argument: task' };
-      return delegateTask(router, task, runnerId, params);
-    }
-    case 'smartrelay_benchmark_run': {
-      const task = typeof args['task'] === 'string' ? args['task'] : '';
-      if (!task) return { error: 'Missing required argument: task' };
-      return benchmarkRun(registry, engine, {
-        task,
-        runner_ids: Array.isArray(args['runner_ids'])
-          ? (args['runner_ids'] as string[])
-          : undefined,
-        params:
-          typeof args['params'] === 'object' && args['params'] !== null
-            ? (args['params'] as Record<string, unknown>)
-            : undefined,
-        reference_answer:
-          typeof args['reference_answer'] === 'string' ? args['reference_answer'] : undefined,
-        judge_runner_id:
-          typeof args['judge_runner_id'] === 'string' ? args['judge_runner_id'] : undefined,
-        eval_criteria:
-          typeof args['eval_criteria'] === 'object' && args['eval_criteria'] !== null
-            ? (args['eval_criteria'] as Record<string, unknown>)
-            : undefined,
-      });
-    }
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
   }
 }
 
@@ -337,7 +146,7 @@ export async function runHttpServer(options?: {
   const port = options?.port ?? 8000;
   const config = options?.config ?? null;
 
-  getRegistry(config);
+  warnIfNoCredentials(getRegistry(config).getRunnersMetadata(), logger);
   logger.info(`Configuration loaded. Starting HTTP API server on ${host}:${port}`);
 
   const app = createHttpServer();

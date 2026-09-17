@@ -9,12 +9,11 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 
-import { BenchmarkEngine } from './benchmark/engine.js';
 import { getLogger } from './logger.js';
-import { TaskRouter } from './router.js';
-import { RunnerRegistry } from './runners/registry.js';
 import {
   askSubagent,
+  auditFileSecurity,
+  auditSecurity,
   benchmarkRun,
   createPlan,
   delegateTask,
@@ -28,7 +27,9 @@ import {
   switchModel,
   testFile,
 } from './tools/index.js';
-import { loadDotEnv } from './util.js';
+import { warnIfNoCredentials } from './credentials.js';
+import { getEngine, getRegistry, getRouter } from './tools/dispatch.js';
+import { describeError, loadDotEnv } from './util.js';
 
 // Auto-load .env
 loadDotEnv();
@@ -41,42 +42,9 @@ export const server = new McpServer({
   version: '0.2.0',
 });
 
-let registryInstance: RunnerRegistry | null = null;
-let engineInstance: BenchmarkEngine | null = null;
-let routerInstance: TaskRouter | null = null;
-
-export function getRegistry(configPath?: string | null): RunnerRegistry {
-  if (!registryInstance) {
-    try {
-      registryInstance = RunnerRegistry.fromYaml(configPath);
-      logger.info(`Loaded runners: [${registryInstance.registeredIds().join(', ')}]`);
-    } catch (err) {
-      logger.warning(`Could not initialize registry on startup: ${err}`);
-      registryInstance = new RunnerRegistry(configPath ?? null);
-    }
-  } else {
-    registryInstance.reloadIfModified();
-  }
-  return registryInstance;
-}
-
-export function getEngine(): BenchmarkEngine {
-  const reg = getRegistry();
-  if (!engineInstance || engineInstance.registry !== reg) {
-    const rawConcurrency = reg.serverConfig['max_concurrency'];
-    const maxConcurrency = typeof rawConcurrency === 'number' ? rawConcurrency : 5;
-    engineInstance = new BenchmarkEngine(reg, maxConcurrency);
-  }
-  return engineInstance;
-}
-
-export function getRouter(): TaskRouter {
-  const reg = getRegistry();
-  if (!routerInstance || routerInstance.registry !== reg) {
-    routerInstance = new TaskRouter(reg);
-  }
-  return routerInstance;
-}
+// The registry/router/engine singletons live in `tools/dispatch.ts` so the MCP
+// server and the HTTP API share one instance instead of each building its own.
+export { getEngine, getRegistry, getRouter } from './tools/dispatch.js';
 
 // =========================================================================
 // REGISTER MCP TOOLS
@@ -152,13 +120,18 @@ server.registerTool(
         .string()
         .optional()
         .describe("Optional review focus areas (default: 'bugs, security, clean code, and performance')."),
+      language: z
+        .string()
+        .optional()
+        .describe("Optional language profile ('flutter', 'typescript', 'python', 'go', 'rust', 'auto'). Default: 'auto'."),
     }),
   },
-  async ({ code, focus }) => {
+  async ({ code, focus, language }) => {
     const result = await reviewCode(
       getRouter(),
       code,
       focus ?? 'bugs, security, clean code, and performance',
+      language ?? 'auto',
     );
     return { content: [{ type: 'text', text: result }] };
   },
@@ -222,13 +195,18 @@ server.registerTool(
         .string()
         .optional()
         .describe("Optional review focus areas (default: 'bugs, security, clean code, and performance')."),
+      language: z
+        .string()
+        .optional()
+        .describe("Optional language profile ('flutter', 'typescript', 'python', 'go', 'rust', 'auto'). Default: 'auto'."),
     }),
   },
-  async ({ file_path, focus }) => {
+  async ({ file_path, focus, language }) => {
     const result = await reviewFile(
       getRouter(),
       file_path,
       focus ?? 'bugs, security, clean code, and performance',
+      language ?? 'auto',
     );
     return { content: [{ type: 'text', text: result }] };
   },
@@ -305,7 +283,67 @@ server.registerTool(
   },
 );
 
-// 11. list_runners
+// 11. audit_security
+server.registerTool(
+  'audit_security',
+  {
+    description:
+      'Perform a comprehensive security audit and vulnerability assessment on source code or snippets. ' +
+      'Evaluates OWASP Top 10, CWE weaknesses, secret leakage, injection flaws, and generates remediation diffs.',
+    inputSchema: z.object({
+      code: z.string().describe('The source code, function, or snippet to audit for security vulnerabilities.'),
+      focus: z
+        .string()
+        .optional()
+        .describe("Optional security focus areas (default: 'OWASP Top 10, CWE vulnerabilities, secrets, and auth flaws')."),
+      language: z
+        .string()
+        .optional()
+        .describe("Optional language profile ('flutter', 'typescript', 'python', 'go', 'rust', 'auto'). Default: 'auto'."),
+    }),
+  },
+  async ({ code, focus, language }) => {
+    const result = await auditSecurity(
+      getRouter(),
+      code,
+      focus ?? 'OWASP Top 10, CWE vulnerabilities, secrets, and auth flaws',
+      language ?? 'auto',
+    );
+    return { content: [{ type: 'text', text: result }] };
+  },
+);
+
+// 12. audit_file_security
+server.registerTool(
+  'audit_file_security',
+  {
+    description:
+      'Audit a source code file for security vulnerabilities directly from disk — TRUE zero Claude token burn. ' +
+      'The MCP server reads the file directly and delegates to the specialized Security Agent.',
+    inputSchema: z.object({
+      file_path: z.string().describe('Absolute or relative path to the source file to audit.'),
+      focus: z
+        .string()
+        .optional()
+        .describe("Optional security focus areas (default: 'OWASP Top 10, CWE vulnerabilities, secrets, and auth flaws')."),
+      language: z
+        .string()
+        .optional()
+        .describe("Optional language profile ('flutter', 'typescript', 'python', 'go', 'rust', 'auto'). Default: 'auto'."),
+    }),
+  },
+  async ({ file_path, focus, language }) => {
+    const result = await auditFileSecurity(
+      getRouter(),
+      file_path,
+      focus ?? 'OWASP Top 10, CWE vulnerabilities, secrets, and auth flaws',
+      language ?? 'auto',
+    );
+    return { content: [{ type: 'text', text: result }] };
+  },
+);
+
+// 13. list_runners
 server.registerTool(
   'list_runners',
   {
@@ -318,7 +356,7 @@ server.registerTool(
   },
 );
 
-// 12. delegate_task
+// 14. delegate_task
 server.registerTool(
   'delegate_task',
   {
@@ -338,7 +376,7 @@ server.registerTool(
   },
 );
 
-// 13. benchmark_run
+// 15. benchmark_run
 server.registerTool(
   'benchmark_run',
   {
@@ -380,7 +418,7 @@ export async function runServer(options?: {
   port?: number;
 }): Promise<void> {
   const configPath = options?.config ?? null;
-  getRegistry(configPath);
+  warnIfNoCredentials(getRegistry(configPath).getRunnersMetadata(), logger);
 
   const transportType = options?.transport ?? 'stdio';
   logger.info(`Starting MCP server with transport: ${transportType}`);
@@ -409,24 +447,76 @@ function checkDirectExecution(): boolean {
   return ['server', 'smartrelay', 'mcp-delegation-server'].includes(base);
 }
 
-if (checkDirectExecution()) {
-  const { values } = parseArgs({
-    options: {
-      config: { type: 'string', short: 'c' },
-      transport: { type: 'string', short: 't', default: 'stdio' },
-      host: { type: 'string', default: '127.0.0.1' },
-      port: { type: 'string', default: '8000' },
-    },
-    allowPositionals: true,
-  });
+const USAGE = `Usage: smartrelay [command] [options]
 
-  runServer({
-    config: values.config,
-    transport: values.transport,
-    host: values.host,
-    port: values.port ? parseInt(values.port, 10) : 8000,
-  }).catch((err) => {
-    logger.error('Fatal error starting MCP server:', err);
-    process.exitCode = 1;
-  });
+Commands:
+  (none) | start     run the MCP server over stdio
+  init               prompt for API keys, then register SmartRelay with your MCP clients
+  setup              prompt for API keys only, saving them to ~/.smartrelay/.env
+
+Options:
+  -c, --config <path>    path to config.yaml
+  -t, --transport <t>    transport to serve on (stdio)
+      --client <ids>     init only: comma-separated clients to register without asking
+                         (claude-code, claude-desktop, cursor, windsurf)
+      --print-config     init only: skip registration, just print the config snippets
+      --non-interactive  take keys from the environment, no prompts
+  -h, --help             show this message`;
+
+if (checkDirectExecution()) {
+  try {
+    // `parseArgs` is strict: without this catch an unknown flag surfaces to the
+    // MCP client as a raw ERR_PARSE_ARGS_UNKNOWN_OPTION stack trace.
+    const { values, positionals } = parseArgs({
+      options: {
+        config: { type: 'string', short: 'c' },
+        transport: { type: 'string', short: 't', default: 'stdio' },
+        host: { type: 'string', default: '127.0.0.1' },
+        port: { type: 'string', default: '8000' },
+        'non-interactive': { type: 'boolean', default: false },
+        client: { type: 'string', multiple: true },
+        'print-config': { type: 'boolean', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+      },
+      allowPositionals: true,
+    });
+
+    const command = positionals[0];
+
+    if (values.help) {
+      process.stdout.write(`${USAGE}\n`);
+    } else if (command === 'setup') {
+      // Dynamic so `node:readline` and the wizard never enter the MCP server's
+      // startup graph, and so nothing can prompt once a transport is connected.
+      const { runSetup } = await import('./setup.js');
+      process.exitCode = await runSetup({
+        nonInteractive: values['non-interactive'],
+        configPath: values.config ?? null,
+      });
+    } else if (command === 'init' || command === 'install') {
+      const { runInstall } = await import('./install.js');
+      process.exitCode = await runInstall({
+        nonInteractive: values['non-interactive'],
+        configPath: values.config ?? null,
+        printOnly: values['print-config'],
+        clients: (values.client ?? []).flatMap((c) => c.split(',')).map((c) => c.trim()).filter(Boolean),
+      });
+    } else if (command && command !== 'start' && command !== 'serve') {
+      logger.error(`Unknown command '${command}'.\n${USAGE}`);
+      process.exitCode = 2;
+    } else {
+      runServer({
+        config: values.config,
+        transport: values.transport,
+        host: values.host,
+        port: values.port ? parseInt(values.port, 10) : 8000,
+      }).catch((err) => {
+        logger.error('Fatal error starting MCP server:', err);
+        process.exitCode = 1;
+      });
+    }
+  } catch (err) {
+    logger.error(`${describeError(err)}\n${USAGE}`);
+    process.exitCode = 2;
+  }
 }

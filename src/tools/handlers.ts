@@ -5,11 +5,13 @@ import path from 'node:path';
 
 import type { BenchmarkEngine, RunBenchmarkOptions } from '../benchmark/engine.js';
 import { benchmarkResultToJson } from '../benchmark/engine.js';
-import { getLogger } from '../logger.js';
+import { noProviderKeysConfigured, SETUP_HINT, summarizeCredentials } from '../credentials.js';
+import { getLogger, recentLogs } from '../logger.js';
 import type { TaskRouter } from '../router.js';
 import { makeRunnerResult, runnerResultToJson } from '../runners/base.js';
 import type { RunnerRegistry } from '../runners/registry.js';
 import { describeError, resolveUserPath } from '../util.js';
+import { buildReviewPrompt, detectLanguage, getReviewProfile } from '../profiles/review-profiles.js';
 
 const logger = getLogger('smartrelay.tools');
 
@@ -28,7 +30,29 @@ export function cleanReviewOutput(output: string): string {
     '## 💡 Suggestions & Improvements',
     '## 💡 Suggestions',
     '✅ No issues found',
-    '⚠️ This reviewer is scoped to Dart/Flutter',
+  ];
+  for (const marker of markers) {
+    const idx = output.indexOf(marker);
+    if (idx !== -1) {
+      return output.slice(idx).trim();
+    }
+  }
+  return output.trim();
+}
+
+/** Extract strictly the security audit report and remove any model reasoning or scratchpad text. */
+export function cleanSecurityOutput(output: string): string {
+  const markers = [
+    '# 🔒 Security Audit Report',
+    '# 🔒',
+    '## 📊 Summary of Vulnerabilities',
+    '## 🚨 Critical & High Vulnerabilities',
+    '## 🚨 Critical',
+    '## 🔴 High',
+    '## 🟡 Medium & Low Vulnerabilities',
+    '## 🟡 Medium',
+    '## 🛡️ Security Hardening & Best Practices',
+    '## 🛡️',
   ];
   for (const marker of markers) {
     const idx = output.indexOf(marker);
@@ -106,23 +130,22 @@ export async function reviewCode(
   router: TaskRouter,
   code: string,
   focus: string = 'bugs, security, clean code, and performance',
+  language: string = 'auto',
 ): Promise<string> {
   const runner = router.routeTask(`Review code with focus on ${focus}`);
   if (!runner) {
     return JSON.stringify({ error: 'No code review runner available. Check config.yaml' });
   }
 
-  const taskPrompt =
-    `Perform a comprehensive code review focusing on: ${focus}.\n\n` +
-    'Format the output strictly using the `# 🛡️ Code Review Report` template with Health Score, ' +
-    'Summary Table, 🚨 Blockers, ⚠️ Warnings, 💡 Suggestions, ✅ Commendations, and 🛠️ Verification Commands.\n\n' +
-    'STRICT RULES:\n' +
-    '- Begin directly with `# 🛡️ Code Review Report`.\n' +
-    '- NEVER output or rewrite the entire source code file.\n' +
-    '- NEVER include internal thinking process, conversational greetings, or closing text.\n\n' +
-    `\`\`\`\n${code}\n\`\`\``;
+  const detectedLang = language.toLowerCase() === 'auto' ? detectLanguage(code) : language;
+  const profile = getReviewProfile(detectedLang);
+  logger.info(
+    `review_code: Using profile '${profile.name}' (requested: '${language}', resolved: '${detectedLang}')`,
+  );
 
-  const result = await runner.execute(taskPrompt);
+  const { taskPrompt, systemPrompt } = buildReviewPrompt(profile, code, focus);
+
+  const result = await runner.execute(taskPrompt, { system_prompt: systemPrompt });
   if (result.success) {
     return cleanReviewOutput(result.output);
   }
@@ -181,6 +204,7 @@ export async function reviewFile(
   router: TaskRouter,
   filePath: string,
   focus: string = 'bugs, security, clean code, and performance',
+  language: string = 'auto',
 ): Promise<string> {
   const { content: code, error } = readFileFromDisk(filePath);
   if (error || code === null) {
@@ -195,17 +219,15 @@ export async function reviewFile(
     return JSON.stringify({ error: 'No code review runner available. Check config.yaml' });
   }
 
-  const taskPrompt =
-    `Perform a comprehensive code review of **\`${resolvedName}\`** focusing on: ${focus}.\n\n` +
-    'Format the output strictly using the `# 🛡️ Code Review Report` template with Health Score, ' +
-    'Summary Table, 🚨 Blockers, ⚠️ Warnings, 💡 Suggestions, ✅ Commendations, and 🛠️ Verification Commands.\n\n' +
-    'STRICT RULES:\n' +
-    '- Begin directly with `# 🛡️ Code Review Report`.\n' +
-    '- NEVER output or rewrite the entire source code file.\n' +
-    '- NEVER include internal thinking process, conversational greetings, or closing text.\n\n' +
-    `\`\`\`\n${code}\n\`\`\``;
+  const detectedLang = language.toLowerCase() === 'auto' ? detectLanguage(code, filePath) : language;
+  const profile = getReviewProfile(detectedLang);
+  logger.info(
+    `review_file: Using profile '${profile.name}' for ${resolvedName} (requested: '${language}', resolved: '${detectedLang}')`,
+  );
 
-  const result = await runner.execute(taskPrompt);
+  const { taskPrompt, systemPrompt } = buildReviewPrompt(profile, code, focus, resolvedName);
+
+  const result = await runner.execute(taskPrompt, { system_prompt: systemPrompt });
   if (result.success) {
     return cleanReviewOutput(result.output);
   }
@@ -298,6 +320,90 @@ export async function explainFile(
   return `Code explanation failed: ${result.error_message}`;
 }
 
+/** Perform an in-depth security audit and vulnerability assessment. */
+export async function auditSecurity(
+  router: TaskRouter,
+  code: string,
+  focus: string = 'OWASP Top 10, CWE vulnerabilities, secrets, and auth flaws',
+  language: string = 'auto',
+): Promise<string> {
+  const runner = router.routeTask(`Perform security audit focusing on ${focus}`);
+  if (!runner) {
+    return JSON.stringify({ error: 'No security agent runner available. Check config.yaml' });
+  }
+
+  const detectedLang = language.toLowerCase() === 'auto' ? detectLanguage(code) : language;
+  const profile = getReviewProfile(detectedLang);
+  logger.info(
+    `audit_security: Using profile '${profile.name}' (requested: '${language}', resolved: '${detectedLang}')`,
+  );
+
+  const taskPrompt =
+    `Perform a rigorous security audit and vulnerability assessment of the provided code focusing on: ${focus}.\n\n` +
+    `Language Profile: ${profile.name}\n\n` +
+    'Format your entire response strictly using the `# 🔒 Security Audit Report` template with Security Posture Score, ' +
+    'Summary of Vulnerabilities table, 🚨 Critical & High Vulnerabilities (with CWE IDs and diffs), 🟡 Medium & Low Vulnerabilities, ' +
+    '🛡️ Security Hardening & Best Practices, and 🛠️ Security Verification & SAST Commands.\n\n' +
+    'STRICT RULES:\n' +
+    '- Begin directly with `# 🔒 Security Audit Report`.\n' +
+    '- NEVER output or rewrite the entire source code file.\n' +
+    '- Provide syntactically valid remediation diffs with 1-2 lines of surrounding unchanged context.\n' +
+    '- Cite CWE numbers where applicable.\n\n' +
+    `\`\`\`\n${code}\n\`\`\``;
+
+  const result = await runner.execute(taskPrompt);
+  if (result.success) {
+    return cleanSecurityOutput(result.output);
+  }
+  return `Security audit failed: ${result.error_message}`;
+}
+
+/** Audit a source code file for security vulnerabilities directly from disk — zero Claude token burn. */
+export async function auditFileSecurity(
+  router: TaskRouter,
+  filePath: string,
+  focus: string = 'OWASP Top 10, CWE vulnerabilities, secrets, and auth flaws',
+  language: string = 'auto',
+): Promise<string> {
+  const { content: code, error } = readFileFromDisk(filePath);
+  if (error || code === null) {
+    return error ?? '❌ Could not read file.';
+  }
+
+  const resolvedName = path.basename(filePath);
+  logger.info(`audit_file_security: Read ${code.length} chars from ${resolvedName}`);
+
+  const runner = router.routeTask(`Perform security audit focusing on ${focus}`);
+  if (!runner) {
+    return JSON.stringify({ error: 'No security agent runner available. Check config.yaml' });
+  }
+
+  const detectedLang = language.toLowerCase() === 'auto' ? detectLanguage(code, filePath) : language;
+  const profile = getReviewProfile(detectedLang);
+  logger.info(
+    `audit_file_security: Using profile '${profile.name}' for ${resolvedName} (requested: '${language}', resolved: '${detectedLang}')`,
+  );
+
+  const taskPrompt =
+    `Perform a rigorous security audit and vulnerability assessment of **\`${resolvedName}\`** focusing on: ${focus}.\n\n` +
+    `Language Profile: ${profile.name}\n\n` +
+    'Format your entire response strictly using the `# 🔒 Security Audit Report` template with Security Posture Score, ' +
+    'Summary of Vulnerabilities table, 🚨 Critical & High Vulnerabilities (with CWE IDs and diffs), 🟡 Medium & Low Vulnerabilities, ' +
+    '🛡️ Security Hardening & Best Practices, and 🛠️ Security Verification & SAST Commands.\n\n' +
+    'STRICT RULES:\n' +
+    '- Begin directly with `# 🔒 Security Audit Report`.\n' +
+    '- NEVER output or rewrite the entire source code file.\n' +
+    '- Provide syntactically valid remediation diffs with 1-2 lines of surrounding unchanged context.\n' +
+    '- Cite CWE numbers where applicable.\n\n' +
+    `\`\`\`\n${code}\n\`\`\``;
+
+  const result = await runner.execute(taskPrompt);
+  if (result.success) {
+    return cleanSecurityOutput(result.output);
+  }
+  return `Security audit failed: ${result.error_message}`;
+}
+
 /** List all registered runners and metadata. */
 export function listRunners(registry: RunnerRegistry): string {
   const metadata = registry.getRunnersMetadata();
@@ -368,6 +474,9 @@ export async function benchmarkRun(
     const metadata = registry.getRunnersMetadata();
     targetRunnerIds = metadata.filter((r) => r.is_authenticated).map((r) => r.runner_id);
     if (targetRunnerIds.length === 0) {
+      // Kept as a fallback rather than an error: keyless runners (Ollama) are
+      // legitimately usable, so refusing here would break local-only setups.
+      logger.warning(`No authenticated runners; falling back to all registered runners. ${SETUP_HINT}`);
       targetRunnerIds = registry.registeredIds();
     }
   }
@@ -395,10 +504,18 @@ export function pluginConfigure(_args?: Record<string, unknown>): Record<string,
 
 export function pluginStatus(registry: RunnerRegistry): Record<string, unknown> {
   try {
+    const summary = summarizeCredentials(registry.getRunnersMetadata());
+    // "Configured" means a hosted provider can actually be reached. The old
+    // hardcoded `true` reported healthy with no credentials at all, and keying
+    // off `ready > 0` would too, since keyless Ollama runners always count.
+    const configured = !noProviderKeysConfigured(summary);
     return {
-      configured: true,
+      configured,
       runners_available: registry.registeredIds().length,
-      status: 'healthy',
+      runners_ready: summary.ready,
+      missing_env_vars: summary.missingEnvVars,
+      status: configured ? 'healthy' : 'unhealthy',
+      ...(configured ? {} : { hint: SETUP_HINT, missing_required: summary.missingRequired }),
     };
   } catch (err) {
     return {
@@ -415,11 +532,17 @@ export function pluginRemove(): Record<string, unknown> {
 
 export function pluginHealthCheck(registry: RunnerRegistry): Record<string, unknown> {
   try {
+    const summary = summarizeCredentials(registry.getRunnersMetadata());
+    const configured = !noProviderKeysConfigured(summary);
     return {
-      status: 'healthy',
+      // Credentials are part of health: a registry that loaded 25 runners it
+      // cannot authenticate is not a working install.
+      status: configured ? 'healthy' : 'unhealthy',
       details: {
-        service: 'smartrelay-http',
+        service: 'smartrelay',
         runners_loaded: registry.registeredIds().length,
+        runners_ready: summary.ready,
+        ...(configured ? {} : { missing_required: summary.missingRequired, hint: SETUP_HINT }),
       },
     };
   } catch (err) {
@@ -431,5 +554,7 @@ export function pluginHealthCheck(registry: RunnerRegistry): Record<string, unkn
 }
 
 export function pluginGetLogs(args?: Record<string, unknown>): Record<string, unknown> {
-  return { logs: [], limit: args?.['limit'] ?? 50 };
+  const requested = args?.['limit'];
+  const limit = typeof requested === 'number' && Number.isFinite(requested) ? requested : 50;
+  return { logs: recentLogs(limit), limit };
 }

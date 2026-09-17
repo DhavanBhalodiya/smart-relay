@@ -1,5 +1,4 @@
-// Inline McpToolDefinition to avoid importing from @mcphub/core internal paths
-type McpToolDefinition = Record<string, unknown>;
+import type { McpToolDefinition } from './types.js';
 
 export const tools: McpToolDefinition[] = [
   // =========================================================================
@@ -8,21 +7,33 @@ export const tools: McpToolDefinition[] = [
 
   {
     name: 'smartrelay_configure',
-    description: 'Configure the SmartRelay plugin with API endpoint and authentication',
+    description: 'Configure SmartRelay with your own provider API keys',
     category: 'settings',
     inputSchema: {
       type: 'object',
       properties: {
-        apiUrl: {
+        nvidiaApiKey: {
           type: 'string',
-          description: 'Base URL of the SmartRelay HTTP API (e.g., https://smartrelay.example.com/v1)',
+          description: 'NVIDIA API key (nvapi-...) — https://build.nvidia.com',
         },
-        apiKey: {
+        openrouterApiKey: {
           type: 'string',
-          description: 'Bearer token for authentication',
+          description: 'OpenRouter API key (sk-or-v1-...) — https://openrouter.ai/keys',
+        },
+        anthropicApiKey: {
+          type: 'string',
+          description: 'Optional Anthropic API key (sk-ant-...)',
+        },
+        openaiApiKey: {
+          type: 'string',
+          description: 'Optional OpenAI API key',
+        },
+        configPath: {
+          type: 'string',
+          description: 'Optional path to a config.yaml defining a custom runner set',
         },
       },
-      required: ['apiUrl', 'apiKey'],
+      required: ['nvidiaApiKey', 'openrouterApiKey'],
       additionalProperties: false,
     },
   },
@@ -367,6 +378,49 @@ export const tools: McpToolDefinition[] = [
         },
       },
       required: ['task'],
+      additionalProperties: false,
+    },
+  },
+
+  {
+    name: 'smartrelay_audit_security',
+    description:
+      'Perform a comprehensive security audit on source code. Evaluates OWASP Top 10, CWE weaknesses, ' +
+      'secret leakage, injection flaws, and generates remediation diffs.',
+    category: 'security',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'The source code to audit' },
+        focus: {
+          type: 'string',
+          description: 'Optional security focus areas',
+        },
+        language: {
+          type: 'string',
+          description: "Optional language profile ('flutter', 'typescript', 'python', 'go', 'rust', 'auto')",
+        },
+      },
+      required: ['code'],
+      additionalProperties: false,
+    },
+  },
+
+  {
+    name: 'smartrelay_audit_file_security',
+    description: 'Audit a source file for security vulnerabilities, read directly from disk.',
+    category: 'security',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Path to the source file to audit' },
+        focus: { type: 'string', description: 'Optional security focus areas' },
+        language: {
+          type: 'string',
+          description: "Optional language profile ('flutter', 'typescript', 'python', 'go', 'rust', 'auto')",
+        },
+      },
+      required: ['file_path'],
       additionalProperties: false,
     },
   },

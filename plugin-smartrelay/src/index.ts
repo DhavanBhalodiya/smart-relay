@@ -1,83 +1,41 @@
 /**
  * SmartRelay MCPHub Plugin
  *
- * A fully-compliant MCPHub plugin that proxies requests to the SmartRelay
- * HTTP API (Fastify backend) over authenticated HTTP/JSON.
+ * Self-contained: the plugin runs SmartRelay's runner registry in-process using
+ * the user's own provider API keys. There is no SmartRelay service to host and
+ * no credential leaves the machine the plugin runs on.
  *
  * Architecture:
- *   Claude Code → MCPHub Gateway → SmartRelayPlugin (this file) → SmartRelay HTTP API
+ *   Claude Code → MCPHub Gateway → SmartRelayPlugin (this file)
+ *                                   → NVIDIA / OpenRouter / Anthropic / OpenAI
+ *
+ * Imports the `/dispatch` subpath rather than the package root on purpose: the
+ * root re-exports `server.js`, which builds an McpServer and calls `loadDotEnv()`
+ * as an import side effect — both wrong inside a host gateway.
  */
 
+import { dispatchTool } from '@theone1345/smartrelay/dispatch';
+
 import { tools } from './tools.js';
-import { handleToolCall } from './handlers.js';
-import { configSchema, type SmartRelayConfig } from './config.schema.js';
+import { handleToolCall, type PluginState } from './handlers.js';
+import { configSchema, missingRequired, type SmartRelayConfig } from './config.schema.js';
+import { applyConfigToEnv } from './env.js';
 
 // ---------------------------------------------------------------------------
 // Minimal inline types so the plugin is self-contained and does NOT import
 // from @mcphub/core internal paths (which fail in the MCPHub bundler/verifier).
 // ---------------------------------------------------------------------------
 
-export interface McpToolDefinition {
-  name: string;
-  description: string;
-  inputSchema?: Record<string, unknown>;
-  [key: string]: unknown;
-}
+export * from './types.js';
 
-export interface McpContext {
-  userId?: string;
-  sessionId?: string;
-  [key: string]: unknown;
-}
-
-export type HealthStatus =
-  | { status: 'healthy'; message?: string }
-  | { status: 'unhealthy'; message?: string };
-
-export interface ConfigMeta {
-  groups?: Array<{ key: string; label: string; order?: number }>;
-  fields?: Record<string, {
-    group?: string;
-    label?: string;
-    fieldType?: string;
-    description?: string;
-    placeholder?: string;
-    [key: string]: unknown;
-  }>;
-}
-
-export interface PluginPricing {
-  tools?: {
-    free?: string[];
-    pro?: string[];
-    enterprise?: string | string[];
-  };
-  limits?: {
-    free?: Record<string, number>;
-    pro?: Record<string, number>;
-    enterprise?: Record<string, number>;
-  };
-}
-
-export interface McpActionPlanStep {
-  id: string;
-  order: number;
-  title: string;
-  description?: string;
-  tool_to_call: string;
-  depends_on?: string[];
-  expected_output?: string;
-}
-
-export interface McpActionPlanDefinition {
-  name: string;
-  display_name: string;
-  description?: string;
-  trigger_phrases?: string[];
-  plugin_name: string;
-  expected_outcome?: string;
-  steps: McpActionPlanStep[];
-}
+import type {
+  ConfigMeta,
+  HealthStatus,
+  McpActionPlanDefinition,
+  McpContext,
+  McpToolDefinition,
+  PluginPricing,
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // SmartRelayPlugin — default export class (required by MCPHub)
@@ -87,11 +45,11 @@ export default class SmartRelayPlugin {
   readonly name = 'smartrelay';
   readonly displayName = 'SmartRelay';
   readonly description =
-    'Delegation, benchmarking, and multi-model orchestration for LLM coding tasks';
-  readonly version = '1.0.0';
+    'Delegation, benchmarking, and multi-model orchestration for LLM coding tasks — bring your own API keys';
+  readonly version = '2.0.0';
   readonly icon = 'Zap';
   readonly category = 'AI';
-  readonly technologies = ['TypeScript', 'Fastify', 'LLM', 'MCP'];
+  readonly technologies = ['TypeScript', 'LLM', 'MCP', 'NVIDIA NIM', 'OpenRouter'];
 
   readonly pricing: PluginPricing = {
     tools: {
@@ -116,6 +74,8 @@ export default class SmartRelayPlugin {
         'smartrelay_explain_file',
         'smartrelay_delegate_task',
         'smartrelay_benchmark_run',
+        'smartrelay_audit_security',
+        'smartrelay_audit_file_security',
       ],
       enterprise: '*',
     },
@@ -126,7 +86,8 @@ export default class SmartRelayPlugin {
     },
   };
 
-  private config: SmartRelayConfig = { apiUrl: '', apiKey: '' };
+  private readonly state: PluginState = { config: configSchema.parse({}) };
+  private configError: string | null = null;
 
   // -------------------------------------------------------------------------
   // MCPHub contract methods
@@ -141,34 +102,73 @@ export default class SmartRelayPlugin {
   }
 
   getSensitiveConfigFields(): string[] {
-    return ['apiKey'];
+    return ['nvidiaApiKey', 'openrouterApiKey', 'anthropicApiKey', 'openaiApiKey'];
   }
 
   async initialize(config: Record<string, unknown>): Promise<void> {
-    this.config = configSchema.parse(config);
+    // `safeParse`, never `parse`: a throw here would leave the plugin dead on
+    // load, with no way for the user to reach settings and correct the value.
+    const parsed = configSchema.safeParse(config ?? {});
+    this.state.config = parsed.success ? parsed.data : configSchema.parse({});
+    this.configError = parsed.success ? null : parsed.error.message;
+    applyConfigToEnv(this.state.config);
   }
 
   async handleToolCall(toolName: string, args: unknown, context: McpContext): Promise<unknown> {
-    return handleToolCall(toolName, args, context, this.config);
+    return handleToolCall(toolName, args, context, this.state);
   }
 
   getConfigMeta(): ConfigMeta {
+    // `fieldType: 'password'` is what makes the host prompt with a masked input —
+    // the plugin-side equivalent of what `smartrelay setup` does in a terminal.
     return {
-      groups: [{ key: 'general', label: 'SmartRelay Configuration', order: 0 }],
+      groups: [
+        { key: 'providers', label: 'Provider API Keys', order: 0 },
+        { key: 'advanced', label: 'Advanced', order: 1 },
+      ],
       fields: {
-        apiUrl: {
-          group: 'general',
-          label: 'API URL',
-          fieldType: 'text',
-          description:
-            'Base URL of the SmartRelay HTTP API (e.g., https://smartrelay.example.com/v1)',
-          placeholder: 'https://smartrelay.example.com/v1',
-        },
-        apiKey: {
-          group: 'general',
-          label: 'API Key',
+        nvidiaApiKey: {
+          group: 'providers',
+          label: 'NVIDIA API Key',
           fieldType: 'password',
-          description: 'Bearer token for authenticating to the SmartRelay service',
+          required: true,
+          description:
+            'Required. Free keys at https://build.nvidia.com. Stored by the host and used ' +
+            'to call NVIDIA directly from wherever this plugin runs.',
+          placeholder: 'nvapi-...',
+        },
+        openrouterApiKey: {
+          group: 'providers',
+          label: 'OpenRouter API Key',
+          fieldType: 'password',
+          required: true,
+          description:
+            'Required. Get one at https://openrouter.ai/keys. Stored by the host and used ' +
+            'to call OpenRouter directly from wherever this plugin runs.',
+          placeholder: 'sk-or-v1-...',
+        },
+        anthropicApiKey: {
+          group: 'providers',
+          label: 'Anthropic API Key',
+          fieldType: 'password',
+          required: false,
+          description: 'Optional — unlocks the Claude runners. Stored by the host.',
+          placeholder: 'sk-ant-...',
+        },
+        openaiApiKey: {
+          group: 'providers',
+          label: 'OpenAI API Key',
+          fieldType: 'password',
+          required: false,
+          description: 'Optional — unlocks the GPT runners. Stored by the host.',
+          placeholder: 'sk-proj-...',
+        },
+        configPath: {
+          group: 'advanced',
+          label: 'config.yaml path',
+          fieldType: 'text',
+          required: false,
+          description: 'Optional path to a config.yaml defining a custom runner set.',
         },
       },
     };
@@ -179,29 +179,36 @@ export default class SmartRelayPlugin {
       {
         name: 'smartrelay-setup',
         display_name: 'SmartRelay Setup',
-        description:
-          'Configure SmartRelay and verify the connection to your delegation service.',
-        trigger_phrases: ['setup smartrelay', 'connect smartrelay', 'configure smartrelay'],
+        description: 'Add your provider API keys and verify the runners they unlock.',
+        trigger_phrases: [
+          'setup smartrelay',
+          'connect smartrelay',
+          'configure smartrelay',
+          'smartrelay api keys',
+          'add smartrelay keys',
+        ],
         plugin_name: this.name,
         expected_outcome:
-          'Working SmartRelay connection with access to code review, testing, and planning tools.',
+          'SmartRelay running in-process with authenticated runners for code review, testing, ' +
+          'planning, and security audits.',
         steps: [
           {
             id: 'configure',
             order: 1,
-            title: 'Configure SmartRelay API endpoint',
-            description: 'Provide the SmartRelay HTTP API URL and authentication token.',
+            title: 'Add your provider API keys',
+            description:
+              'Enter your NVIDIA and OpenRouter API keys. Anthropic and OpenAI are optional.',
             tool_to_call: 'smartrelay_configure',
-            expected_output: '{ "status": "configured" }',
+            expected_output: '{ "status": "configured", "keys_set": ["NVIDIA_API_KEY", "OPENROUTER_API_KEY"] }',
           },
           {
             id: 'verify',
             order: 2,
-            title: 'Verify connection is working',
-            description: 'Check that the plugin can reach the SmartRelay service.',
+            title: 'Verify the keys resolve to working runners',
+            description: 'Check that the configured credentials authenticate at least one runner.',
             tool_to_call: 'smartrelay_health_check',
             depends_on: ['configure'],
-            expected_output: '{ "status": "healthy" }',
+            expected_output: '{ "status": "healthy", "message": "N/M runners authenticated" }',
           },
           {
             id: 'list',
@@ -218,32 +225,35 @@ export default class SmartRelayPlugin {
   }
 
   async healthCheck(): Promise<HealthStatus> {
-    // If not configured yet, return unhealthy
-    if (!this.config.apiUrl || !this.config.apiKey) {
-      return { status: 'unhealthy', message: 'SmartRelay not configured' };
+    if (this.configError) {
+      return { status: 'unhealthy', message: `Invalid plugin configuration: ${this.configError}` };
     }
 
-    // Try to ping the remote SmartRelay service
+    const missing = missingRequired(this.state.config);
+    if (missing.length) {
+      return {
+        status: 'unhealthy',
+        message: `Missing required API keys: ${missing.join(', ')}. Add them in plugin settings.`,
+      };
+    }
+
+    // Deliberately local: no model is called. Health checks run often and a
+    // round trip to a provider would cost real money every time.
     try {
-      const response = await fetch(`${this.config.apiUrl}/health`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${this.config.apiKey}`,
-        },
-      });
+      const raw = await dispatchTool('smartrelay_list_runners');
+      const runners = JSON.parse(raw as string) as Array<{ is_authenticated: boolean }>;
+      const ready = runners.filter((r) => r.is_authenticated).length;
 
-      if (!response.ok) {
-        return {
-          status: 'unhealthy',
-          message: `SmartRelay service returned ${response.status}`,
-        };
-      }
-
-      return { status: 'healthy', message: 'SmartRelay connected and healthy' };
+      return ready > 0
+        ? { status: 'healthy', message: `${ready}/${runners.length} runners authenticated` }
+        : {
+            status: 'unhealthy',
+            message: 'Runners loaded but no credentials resolved — check the keys in plugin settings',
+          };
     } catch (e) {
       return {
         status: 'unhealthy',
-        message: `Failed to reach SmartRelay: ${e instanceof Error ? e.message : String(e)}`,
+        message: `Runner registry failed to load: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
   }

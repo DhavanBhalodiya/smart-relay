@@ -11,6 +11,7 @@ import { OpenAIRunner } from './openai.js';
 import { OpenRouterRunner } from './openrouter.js';
 import type { BaseRunner, RunnerConfig } from './base.js';
 import { getLogger } from '../logger.js';
+import { SETUP_COMMAND } from '../credentials.js';
 import { describeError, findProjectRoot, resolveUserPath } from '../util.js';
 
 const logger = getLogger('mcp_delegation_server.registry');
@@ -50,6 +51,8 @@ export interface RunnerMetadata {
   credentials_env_var: string | null;
   is_authenticated: boolean;
   base_url: string | null;
+  /** How to fix this runner's missing credential; `null` when it is ready. */
+  setup_hint: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -312,6 +315,9 @@ export class RunnerRegistry {
         credentials_env_var: cfg.api_key_env,
         is_authenticated: isReady,
         base_url: cfg.base_url,
+        setup_hint: isReady
+          ? null
+          : `Set ${cfg.api_key_env ?? DEFAULT_ENV_BY_TYPE[cfg.type] ?? 'the provider API key'} — run: ${SETUP_COMMAND}`,
       });
     }
     return metadata;

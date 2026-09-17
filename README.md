@@ -22,11 +22,99 @@ Before installing, ensure you have:
 
 ---
 
+## 🔑 Install in One Command
+
+```bash
+npx @theone1345/smartrelay init
+```
+
+That single command asks for your API keys in the terminal, then registers
+SmartRelay with whichever MCP clients it finds:
+
+```
+SmartRelay setup
+────────────────
+NVIDIA_API_KEY — NVIDIA NIM / API Catalog  [required]
+  Get one at https://build.nvidia.com
+  key (input hidden, paste is fine):
+  stored nvapi-…6789
+
+OPENROUTER_API_KEY — OpenRouter  [required]
+  ...
+
+Saved 2 keys to ~/.smartrelay/.env (mode 600)
+23 of 25 runners ready.
+
+Register SmartRelay as an MCP server
+────────────────────────────────────
+  Add to Claude Code? [Y/n]
+  Add to Cursor? [Y/n]
+
+Registering…
+  ✔ Claude Code — registered with the claude CLI
+  ✔ Cursor — added to ~/.cursor/mcp.json
+
+Restart the client to load SmartRelay.
+```
+
+**NVIDIA** and **OpenRouter** are required — they back all five sub-agents.
+**Anthropic** and **OpenAI** are optional; press Enter to skip. Keystrokes are
+hidden as you type and each key is echoed back masked.
+
+Keys go to `~/.smartrelay/.env` at mode `600`, outside any repository. Re-running
+shows what is already set and keeps it on Enter; the file is merged, never
+overwritten. Client configs are merged the same way — your other MCP servers stay
+put, and a backup is written before any change.
+
+> Keys are collected in the terminal rather than through an MCP elicitation
+> dialog on purpose: the elicitation schema has no masked field type, so a key
+> entered that way would appear in plain text and reach the client's transcript.
+
+### Other ways to run it
+
+```bash
+# Keys only, no client registration
+npx @theone1345/smartrelay setup
+
+# Print the config for every client, change nothing
+npx @theone1345/smartrelay init --print-config
+
+# Register specific clients without being asked
+npx @theone1345/smartrelay init --client claude-code,cursor
+
+# CI / Dockerfile — take keys from the environment, no prompts
+NVIDIA_API_KEY=... OPENROUTER_API_KEY=... \
+  npx @theone1345/smartrelay init --non-interactive --client claude-code
+```
+
+Supported client ids: `claude-code` (via the `claude` CLI), `claude-desktop`,
+`cursor`, `windsurf`.
+
+### Where keys are read from
+
+Highest priority wins:
+
+| # | Source | Notes |
+|---|---|---|
+| 1 | `process.env` | including your MCP client's `"env": {}` block |
+| 2 | `<cwd>/.env` | project-local |
+| 3 | `<project root>/.env` | |
+| 4 | `~/.smartrelay/.env` | written by `smartrelay setup` |
+
+Every source is read, in that order — a key defined only in a lower-priority file
+is still picked up. If no provider key resolves, the server logs a warning naming
+the fix on startup (to stderr, so the stdio JSON-RPC stream stays clean) rather
+than failing silently at the first tool call.
+
+---
+
 ## 🚀 Quick Install
 
 ### Option A — `npx` *(Easiest — zero install, runs everywhere)*
 
-Add directly to your Claude Desktop / Cursor / Windsurf configuration:
+`npx @theone1345/smartrelay init` does all of this for you, including the keys.
+To wire it up by hand instead, add the following to your Claude Desktop / Cursor /
+Windsurf configuration:
 
 ```json
 {
@@ -119,7 +207,7 @@ Switch models on the fly during your session — just type plain English:
 
 ---
 
-## 🛠️ 13 MCP Tools
+## 🛠️ 15 MCP Tools
 
 | Tool | What It Does |
 | :--- | :--- |
@@ -243,6 +331,15 @@ npm install
 ```
 
 ### 2. Configure Environment Variables
+
+The quickest route is the wizard, which writes `~/.smartrelay/.env` for every
+project at once:
+
+```bash
+npm run setup
+```
+
+Or keep the keys inside the checkout:
 
 ```bash
 cp .env.example .env
@@ -444,6 +541,10 @@ Opens at **http://localhost:6274**
 ## 🔒 Security Notes
 
 - API keys are read from environment variables only — never hardcoded
+- `smartrelay setup` stores keys in `~/.smartrelay/.env` at mode `600`, written
+  via a temp file and rename so an interrupted run leaves nothing half-written
+- Keys are never echoed in full — the wizard and all logs show a masked form, and
+  `smartrelay_get_logs` redacts anything matching a provider key prefix
 - The HTTP API requires a Bearer token (`SMARTRELAY_HTTP_API_KEY`)
 - The MCP stdio server is local-only (no network exposure)
 - No `process.exit()` calls — uses `process.exitCode` for safe shutdown

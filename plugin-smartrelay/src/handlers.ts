@@ -1,114 +1,83 @@
-import type { SmartRelayConfig } from './config.schema.js';
+import { dispatchTool } from '@theone1345/smartrelay/dispatch';
 
-// Inline McpContext to avoid importing from @mcphub/core internal paths
-interface McpContext {
-  userId?: string;
-  sessionId?: string;
-  [key: string]: unknown;
-}
+import { configSchema, missingRequired, type SmartRelayConfig } from './config.schema.js';
+import { applyConfigToEnv } from './env.js';
+import { tools } from './tools.js';
+
+const KNOWN_TOOLS = new Set(tools.map((tool) => tool.name));
 
 /**
- * Call a tool on the remote SmartRelay HTTP API.
+ * Tools that must answer even with no credentials configured.
+ *
+ * These are the settings tools MCPHub itself calls to render and verify the
+ * plugin's state. Gating them behind "not configured" would be circular: the
+ * host could never find out *that* it is unconfigured.
  */
-async function callSmartRelay(
-  toolSuffix: string,
-  args: Record<string, unknown>,
-  config: SmartRelayConfig,
-): Promise<unknown> {
-  if (!config.apiUrl || !config.apiKey) {
-    return { error: 'SmartRelay not configured. Call smartrelay_configure first.' };
-  }
+const ALWAYS_AVAILABLE = new Set(
+  tools.filter((tool) => tool.category === 'settings').map((tool) => tool.name),
+);
 
-  const url = `${config.apiUrl}/tools/${toolSuffix}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(args),
-  });
+/** Where to obtain each missing key, so the error names its own fix. */
+const KEY_CONSOLES: Record<string, string> = {
+  nvidiaApiKey: 'https://build.nvidia.com',
+  openrouterApiKey: 'https://openrouter.ai/keys',
+};
 
-  if (!response.ok) {
-    const error = await response.text();
-    return { error: `HTTP ${response.status}: ${error}` };
-  }
+import type { McpContext } from './types.js';
 
-  // SmartRelay returns either JSON or plain text depending on the tool
-  const contentType = response.headers.get('content-type');
-  if (contentType?.includes('application/json')) {
-    return response.json();
-  }
-  return response.text();
+/** Lets `smartrelay_configure` update the live config the plugin instance holds. */
+export interface PluginState {
+  config: SmartRelayConfig;
 }
 
 export async function handleToolCall(
   toolName: string,
   args: unknown,
-  context: McpContext,
-  config: SmartRelayConfig,
+  _context: McpContext,
+  state: PluginState,
 ): Promise<unknown> {
-  const a = args as Record<string, unknown>;
+  const a = (args ?? {}) as Record<string, unknown>;
 
   switch (toolName) {
-    // Settings tools
-    case 'smartrelay_configure':
-      return { status: 'configured' };
-    case 'smartrelay_status':
-      return callSmartRelay('status', {}, config);
+    case 'smartrelay_configure': {
+      const merged = configSchema.parse({ ...state.config, ...a });
+      state.config = merged;
+      const keysSet = applyConfigToEnv(merged);
+      // Deliberately does NOT write ~/.smartrelay/.env: the host owns its own
+      // config store, and a plugin writing to the user's home directory would
+      // fight `smartrelay setup` on the next run.
+      return { status: 'configured', keys_set: keysSet, missing: missingRequired(merged) };
+    }
+
     case 'smartrelay_remove':
       return { status: 'removed' };
-    case 'smartrelay_health_check':
-      return callSmartRelay('health_check', {}, config);
-    case 'smartrelay_get_logs':
-      return callSmartRelay('get_logs', { limit: a.limit ?? 50 }, config);
 
-    // Model switching
-    case 'smartrelay_switch_model':
-      return callSmartRelay('switch_model', { model: a.model }, config);
-    case 'smartrelay_get_active_model':
-      return callSmartRelay('get_active_model', {}, config);
+    default: {
+      // Reject an unrecognized name before the credential guard, so a typo
+      // always reports as a typo instead of as "not configured".
+      const canonical = toolName.startsWith('smartrelay_') ? toolName : `smartrelay_${toolName}`;
+      if (!KNOWN_TOOLS.has(canonical)) throw new Error(`Unknown tool: ${toolName}`);
 
-    // Delegation tools
-    case 'smartrelay_create_plan':
-      return callSmartRelay('create_plan', { goal: a.goal, context: a.context ?? '' }, config);
-    case 'smartrelay_review_code':
-      return callSmartRelay('review_code', { code: a.code, focus: a.focus }, config);
-    case 'smartrelay_generate_tests':
-      return callSmartRelay('generate_tests', { code: a.code, framework: a.framework }, config);
-    case 'smartrelay_ask_subagent':
-      return callSmartRelay('ask_subagent', { prompt: a.prompt, model: a.model }, config);
-    case 'smartrelay_review_file':
-      return callSmartRelay('review_file', { file_path: a.file_path, focus: a.focus }, config);
-    case 'smartrelay_test_file':
-      return callSmartRelay('test_file', { file_path: a.file_path, framework: a.framework }, config);
-    case 'smartrelay_explain_code':
-      return callSmartRelay('explain_code', {
-        code: a.code,
-        audience: a.audience,
-        language: a.language,
-      }, config);
-    case 'smartrelay_explain_file':
-      return callSmartRelay('explain_file', { file_path: a.file_path, audience: a.audience }, config);
-    case 'smartrelay_list_runners':
-      return callSmartRelay('list_runners', {}, config);
-    case 'smartrelay_delegate_task':
-      return callSmartRelay('delegate_task', {
-        task: a.task,
-        runner_id: a.runner_id,
-        params: a.params,
-      }, config);
-    case 'smartrelay_benchmark_run':
-      return callSmartRelay('benchmark_run', {
-        task: a.task,
-        runner_ids: a.runner_ids,
-        params: a.params,
-        reference_answer: a.reference_answer,
-        judge_runner_id: a.judge_runner_id,
-        eval_criteria: a.eval_criteria,
-      }, config);
-
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
+      const missing = missingRequired(state.config);
+      if (missing.length && !ALWAYS_AVAILABLE.has(canonical)) {
+        return {
+          error:
+            `SmartRelay is not configured. Missing required API keys: ${missing.join(', ')}.`,
+          missing,
+          // Spelled out so an agent reading this can complete setup itself
+          // instead of only reporting the failure back to the user.
+          how_to_fix: {
+            option_1: 'Open the SmartRelay plugin settings and fill in the required keys.',
+            option_2: `Call smartrelay_configure with { ${missing.map((f) => `"${f}": "..."`).join(', ')} }`,
+            get_keys: Object.fromEntries(missing.map((f) => [f, KEY_CONSOLES[f] ?? ''])),
+          },
+        };
+      }
+      // Everything else goes straight to the shared dispatcher, which already
+      // normalizes the `smartrelay_` prefix, validates required arguments, and
+      // throws `Unknown tool:` for anything it does not handle. Adding a tool to
+      // SmartRelay therefore reaches this plugin with no change here.
+      return dispatchTool(toolName, a);
+    }
   }
 }

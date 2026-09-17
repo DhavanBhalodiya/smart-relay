@@ -100,6 +100,30 @@ describe('Fastify HTTP API Server', () => {
     expect(response.body).toContain("Switched to 'auto' mode");
   });
 
+  it('validates missing required arguments for smartrelay_audit_security', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/tools/smartrelay_audit_security',
+      headers: { authorization: `Bearer ${TEST_KEY}` },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body) as { error: string };
+    expect(body.error).toContain('Missing required argument: code');
+  });
+
+  it('validates missing required arguments for smartrelay_audit_file_security', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/tools/smartrelay_audit_file_security',
+      headers: { authorization: `Bearer ${TEST_KEY}` },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body) as { error: string };
+    expect(body.error).toContain('Missing required argument: file_path');
+  });
+
   it('returns 400 for unknown tool calls', async () => {
     const response = await app.inject({
       method: 'POST',

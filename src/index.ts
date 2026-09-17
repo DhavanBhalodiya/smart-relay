@@ -1,7 +1,11 @@
 /** Main entrypoint for SmartRelay. */
 
 export * from './server.js';
-export { createHttpServer, runHttpServer, dispatchTool, verifyApiKey } from './http-api.js';
+export { createHttpServer, runHttpServer, verifyApiKey } from './http-api.js';
+// Exported from the module that owns them, not via the two entrypoints that
+// re-export them, so `export *` above cannot make the name ambiguous.
+export { createDispatchContext, dispatchTool } from './tools/dispatch.js';
+export * from './credentials.js';
 export * from './router.js';
 export * from './logger.js';
 export * from './util.js';

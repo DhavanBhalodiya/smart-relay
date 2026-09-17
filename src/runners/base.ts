@@ -1,6 +1,7 @@
 /** Base classes and data models for LLM runners. */
 
 import { round } from '../util.js';
+import { SETUP_COMMAND } from '../credentials.js';
 
 /**
  * Configuration for a specific LLM runner.
@@ -110,6 +111,21 @@ export function resolveParams(
     systemPrompt: typeof systemPrompt === 'string' && systemPrompt ? systemPrompt : undefined,
     timeoutSeconds: (merged['timeout_seconds'] as number | undefined) ?? config.timeout_seconds,
   };
+}
+
+/**
+ * The message a runner returns when its credential env var is unset.
+ *
+ * The first two sentences are byte-identical to what SmartRelay has always
+ * returned — existing tests assert on them with `toContain` — and the setup hint
+ * is appended so the error names its own fix.
+ */
+export function authErrorMessage(envVarName: string, runnerId: string): string {
+  return (
+    `Authentication error: Environment variable '${envVarName}' is not set. ` +
+    `Please export ${envVarName}=<your-key> to use runner '${runnerId}'. ` +
+    `Or run \`${SETUP_COMMAND}\` to store your provider keys in ~/.smartrelay/.env.`
+  );
 }
 
 /** Abstract base class for all LLM backend runners. */

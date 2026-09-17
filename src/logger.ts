@@ -32,11 +32,34 @@ export interface Logger {
   error(message: string, ...args: unknown[]): void;
 }
 
+/** How many recent lines `recentLogs()` can return. */
+const RING_CAPACITY = 200;
+const ring: string[] = [];
+
+/**
+ * Anything shaped like a provider key, so a log line that happens to interpolate
+ * a credential cannot leak it back out through `smartrelay_get_logs`.
+ */
+const SECRET_PATTERN = /\b(?:nvapi-|sk-or-v1-|sk-ant-|sk-proj-|sk-)[A-Za-z0-9_\-]{8,}/g;
+
+function redact(line: string): string {
+  return line.replace(SECRET_PATTERN, (match) => `${match.slice(0, 6)}…[redacted]`);
+}
+
+/** The most recent log lines, newest last, with credentials masked. */
+export function recentLogs(limit = 50): string[] {
+  const bounded = Math.max(0, Math.min(limit, RING_CAPACITY));
+  return ring.slice(-bounded);
+}
+
 export function getLogger(name: string): Logger {
   const emit = (level: LogLevel, message: string, args: unknown[]): void => {
     if (LEVELS[level] < activeLevel()) return;
     const suffix = args.length ? ` ${args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}` : '';
-    process.stderr.write(`${timestamp()} [${level.toUpperCase()}] ${name}: ${message}${suffix}\n`);
+    const line = redact(`${timestamp()} [${level.toUpperCase()}] ${name}: ${message}${suffix}`);
+    ring.push(line);
+    if (ring.length > RING_CAPACITY) ring.shift();
+    process.stderr.write(`${line}\n`);
   };
 
   return {

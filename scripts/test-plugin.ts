@@ -4,7 +4,9 @@
  * Run: npx tsx scripts/test-plugin.ts
  */
 
-import SmartRelayPlugin from '../plugin-smartrelay/src/index.ts';
+// Built output, not src: the plugin resolves '@theone1345/smartrelay/dispatch'
+// through its package exports, so run `npm run build && npm run build:plugin` first.
+import SmartRelayPlugin from '../plugin-smartrelay/dist/index.js';
 
 // ─── Colors ────────────────────────────────────────────────────────────────
 const GREEN = '\x1b[32m';
@@ -83,13 +85,15 @@ async function main() {
   const emptyParsed = schema.safeParse({});
   check('schema.safeParse({}) succeeds (handles empty config)', emptyParsed.success);
   if (emptyParsed.success) {
-    check('parsed config has apiUrl field', 'apiUrl' in emptyParsed.data);
-    check('parsed config has apiKey field', 'apiKey' in emptyParsed.data);
+    check('parsed config has nvidiaApiKey field', 'nvidiaApiKey' in emptyParsed.data);
+    check('parsed config has openrouterApiKey field', 'openrouterApiKey' in emptyParsed.data);
   }
 
   const sensitiveFields = p.getSensitiveConfigFields();
   check('getSensitiveConfigFields() returns array', Array.isArray(sensitiveFields));
-  check('apiKey is marked sensitive', sensitiveFields.includes('apiKey'));
+  check('every provider key is marked sensitive',
+    ['nvidiaApiKey', 'openrouterApiKey', 'anthropicApiKey', 'openaiApiKey']
+      .every((f) => sensitiveFields.includes(f)));
 
   // ── 5. initialize() ─────────────────────────────────────────────────────
   console.log(`\n${YELLOW}5. initialize()${RESET}`);
@@ -100,7 +104,7 @@ async function main() {
     check('initialize({}) does not throw', false, String(e));
   }
   try {
-    await p.initialize({ apiUrl: 'https://example.com/v1', apiKey: 'test-token' });
+    await p.initialize({ nvidiaApiKey: 'nvapi-test', openrouterApiKey: 'sk-or-v1-test' });
     check('initialize() with config does not throw', true);
   } catch (e) {
     check('initialize() with config does not throw', false, String(e));
@@ -128,9 +132,15 @@ async function main() {
   check("healthCheck() has 'status' field", 'status' in health);
   check("status is 'healthy' or 'unhealthy'",
     health.status === 'healthy' || health.status === 'unhealthy');
-  // Should be unhealthy (no config yet)
-  check("status is 'unhealthy' when not configured", health.status === 'unhealthy');
+  // `p` was configured in section 5, so it should now report healthy.
+  check("status is 'healthy' once keys are configured", health.status === 'healthy');
   console.log(`     → message: "${health.message}"`);
+
+  const unconfigured = new SmartRelayPlugin();
+  await unconfigured.initialize({});
+  const blocked = await unconfigured.healthCheck();
+  check("status is 'unhealthy' before any keys are set", blocked.status === 'unhealthy');
+  console.log(`     → message: "${blocked.message}"`);
 
   // ── 8. getActionPlans() ────────────────────────────────────────────────
   console.log(`\n${YELLOW}8. Action plans${RESET}`);
